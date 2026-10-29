@@ -47,14 +47,66 @@ def handle_incoming_message(
                 "message": "Duplicate webhook payload ignored"
             }
 
-    # Find customer in database
+    # Find or auto-create customer in database
+    now = datetime.utcnow()
     customer = db.query(Customer).filter(
         (Customer.phone == clean_digits) |
         (Customer.phone.ilike(f"%{clean_digits[-10:]}"))
     ).first()
 
-    customer_name = customer.full_name if customer else f"WhatsApp User (+{clean_digits})"
-    customer_id = customer.id if customer else None
+    if not customer:
+        phone_display = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
+        customer = Customer(
+            full_name=f"WhatsApp User (+{phone_display})",
+            phone=clean_digits,
+            formatted_phone=f"+{clean_digits}",
+            consent_status="verified",
+            consent_source="whatsapp_inbound",
+            consent_date=now,
+            lead_stage="New",
+            notes="Auto-created from incoming WhatsApp message."
+        )
+        db.add(customer)
+        db.flush()
+
+    customer_name = customer.full_name
+    customer_id = customer.id
+
+    # Handle outbound messages sent from the linked WhatsApp phone app (sync to CRM inbox)
+    if payload.get("is_from_me"):
+        conversation = db.query(Conversation).filter(
+            (Conversation.phone == clean_digits) |
+            (Conversation.phone.ilike(f"%{clean_digits[-10:]}"))
+        ).first()
+        if not conversation:
+            conversation = Conversation(
+                customer_id=customer_id,
+                phone=clean_digits,
+                customer_name=customer_name,
+                status="waiting_reply",
+                last_message_at=now,
+                created_at=now,
+                updated_at=now
+            )
+            db.add(conversation)
+            db.flush()
+        else:
+            conversation.last_message_at = now
+            conversation.updated_at = now
+
+        msg_entry = Message(
+            conversation_id=conversation.id,
+            customer_id=customer_id,
+            direction="outbound",
+            sender_type="user",
+            body=text,
+            provider_message_id=message_id,
+            delivery_status="sent",
+            created_at=now
+        )
+        db.add(msg_entry)
+        db.commit()
+        return {"status": "success", "action": "outbound_synced"}
 
     # Find if this contact was part of any recent campaign
     recent_recipient = db.query(CampaignRecipient).filter(
@@ -185,7 +237,10 @@ def handle_incoming_message(
     db.add(inquiry)
 
     # Maintain persistent Conversation & Message record
-    conversation = db.query(Conversation).filter(Conversation.phone == clean_digits).first()
+    conversation = db.query(Conversation).filter(
+        (Conversation.phone == clean_digits) |
+        (Conversation.phone.ilike(f"%{clean_digits[-10:]}"))
+    ).first()
     if not conversation:
         conversation = Conversation(
             customer_id=customer_id,
@@ -203,6 +258,9 @@ def handle_incoming_message(
         conversation.status = "open"
         if customer_id and not conversation.customer_id:
             conversation.customer_id = customer_id
+        if customer_name and conversation.customer_name.startswith("WhatsApp User") and not customer_name.startswith("WhatsApp User"):
+            conversation.customer_name = customer_name
+        conversation.updated_at = now
 
     # Add Message item
     msg_entry = Message(

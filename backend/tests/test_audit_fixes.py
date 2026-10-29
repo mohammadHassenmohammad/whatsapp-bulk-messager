@@ -356,3 +356,26 @@ def test_option_b_numbered_quick_reply_triggers(test_db, test_client):
     assert cust.is_suppressed is True
     assert cust.consent_status == "opted_out"
 
+    # 5. Verify conversation and messages appear in CRM Inbox
+    inbox_resp = test_client.get("/api/crm/conversations")
+    assert inbox_resp.status_code == 200
+    convs = inbox_resp.json()
+    assert len(convs) >= 1
+    match = next((c for c in convs if "15559871111" in c["phone"]), None)
+    assert match is not None
+
+    detail_resp = test_client.get(f"/api/crm/conversations/{match['id']}")
+    assert detail_resp.status_code == 200
+    thread = detail_resp.json()
+    assert len(thread["messages"]) >= 2
+
+    # 6. Test arbitrary customer reply (any question/text) appears in inbox
+    resp3 = test_client.post(
+        "/api/webhooks/incoming",
+        headers=headers,
+        json={"phone": "15559871111", "text": "Can you give me a discount?", "message_id": "test_msg_3"}
+    )
+    assert resp3.status_code == 200
+    updated_thread = test_client.get(f"/api/crm/conversations/{match['id']}").json()
+    assert any("Can you give me a discount?" in m["body"] for m in updated_thread["messages"])
+

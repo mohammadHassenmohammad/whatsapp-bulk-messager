@@ -71,30 +71,32 @@ export const Inbox = () => {
   }, [statusFilter, searchQuery]);
 
   // Load selected conversation detail
-  const loadConversationDetail = async (id) => {
+  const loadConversationDetail = async (id, silent = false) => {
     if (!id) return;
-    setLoadingChat(true);
+    if (!silent) setLoadingChat(true);
     try {
       const conv = await api.getConversation(id);
       setSelectedConv(conv);
-      // Fetch AI suggested replies if conversation has messages
-      if (conv?.messages && conv.messages.length > 0) {
+      // Fetch suggested quick replies if conversation has messages
+      if (!silent && conv?.messages && conv.messages.length > 0) {
         const lastMsg = conv.messages[conv.messages.length - 1];
         fetchSuggestions(lastMsg.body, conv.customer_name);
-      } else {
-        setAiSuggestions([]);
       }
     } catch (err) {
       console.error('Failed to load conversation details:', err);
-      showToast('Failed to load message thread', 'error');
+      if (!silent) showToast('Failed to load message thread', 'error');
     } finally {
-      setLoadingChat(false);
+      if (!silent) setLoadingChat(false);
     }
   };
 
   useEffect(() => {
     if (selectedConvId) {
-      loadConversationDetail(selectedConvId);
+      loadConversationDetail(selectedConvId, false);
+      const interval = setInterval(() => {
+        loadConversationDetail(selectedConvId, true);
+      }, 4000);
+      return () => clearInterval(interval);
     }
   }, [selectedConvId]);
 

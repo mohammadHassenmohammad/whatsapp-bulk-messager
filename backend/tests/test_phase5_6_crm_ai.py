@@ -105,6 +105,11 @@ def test_conversation_and_messages(db_session):
     assert loaded_conv.messages[0].direction == "inbound"
     assert loaded_conv.messages[1].direction == "outbound"
 
+    loaded_conv = db_session.query(Conversation).filter(Conversation.id == conv.id).first()
+    assert len(loaded_conv.messages) == 2
+    assert loaded_conv.messages[0].direction == "inbound"
+    assert loaded_conv.messages[1].direction == "outbound"
+
 def test_customer_lead_stage_and_timeline(db_session):
     """Verify lead stage transitions and chronological timeline generation."""
     cust = Customer(

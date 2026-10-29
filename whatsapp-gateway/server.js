@@ -69,42 +69,129 @@ async function initWhatsApp(forceNew = false) {
 
     sock.ev.on('creds.update', saveCreds);
 
+    // Helper: Determine if JID represents an individual direct 1-to-1 chat (not groups or channels)
+    function isDirectChat(jid) {
+      if (!jid) return false;
+      if (jid.includes('@g.us') || jid.includes('@broadcast') || jid.includes('@newsletter')) {
+        return false;
+      }
+      return jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');
+    }
+
+    // Helper: Resolve true phone number from standard JID or WhatsApp LID (Linked Identity)
+    async function resolvePhoneFromJid(jid, msgObj) {
+      if (!jid) return null;
+      if (jid.endsWith('@s.whatsapp.net')) {
+        return jid.split('@')[0].split(':')[0];
+      }
+      if (jid.endsWith('@lid')) {
+        // 1. Check message alt fields if provided by Baileys
+        const alt = msgObj?.key?.remoteJidAlt || msgObj?.key?.participantAlt;
+        if (alt && alt.endsWith('@s.whatsapp.net')) {
+          return alt.split('@')[0].split(':')[0];
+        }
+        // 2. Query Baileys signalRepository LID mapping in memory
+        try {
+          if (sock?.signalRepository?.lidMapping?.getPNForLID) {
+            const pn = await sock.signalRepository.lidMapping.getPNForLID(jid);
+            if (pn) return pn.split('@')[0].split(':')[0];
+          }
+        } catch (e) {}
+        // 3. Check persistent auth reverse LID mapping file
+        try {
+          const lidClean = jid.split('@')[0].split(':')[0];
+          const reverseFile = path.join(AUTH_DIR, `lid-mapping-${lidClean}_reverse.json`);
+          if (fs.existsSync(reverseFile)) {
+            const raw = JSON.parse(fs.readFileSync(reverseFile, 'utf8'));
+            if (raw) return String(raw).split('@')[0].split(':')[0];
+          }
+        } catch (e) {}
+        // 4. Fallback to raw LID identifier digits
+        return jid.split('@')[0].split(':')[0];
+      }
+      return null;
+    }
+
+    // Helper: Recursively unwrap all WhatsApp message containers (ephemeral, viewOnce, etc.)
+    function extractMessageContent(rawMessage) {
+      if (!rawMessage) return '';
+      let m = rawMessage;
+      while (
+        m?.ephemeralMessage?.message ||
+        m?.viewOnceMessage?.message ||
+        m?.viewOnceMessageV2?.message ||
+        m?.documentWithCaptionMessage?.message
+      ) {
+        m =
+          m.ephemeralMessage?.message ||
+          m.viewOnceMessage?.message ||
+          m.viewOnceMessageV2?.message ||
+          m.documentWithCaptionMessage?.message;
+      }
+
+      let text = '';
+      if (m.conversation) {
+        text = m.conversation;
+      } else if (m.extendedTextMessage?.text) {
+        text = m.extendedTextMessage.text;
+      } else if (m.buttonsResponseMessage?.selectedButtonId || m.buttonsResponseMessage?.selectedDisplayText) {
+        text = m.buttonsResponseMessage.selectedButtonId || m.buttonsResponseMessage.selectedDisplayText;
+      } else if (m.templateButtonReplyMessage?.selectedId || m.templateButtonReplyMessage?.selectedDisplayText) {
+        text = m.templateButtonReplyMessage.selectedId || m.templateButtonReplyMessage.selectedDisplayText;
+      } else if (m.listResponseMessage?.singleSelectReply?.selectedRowId || m.listResponseMessage?.title) {
+        text = m.listResponseMessage.singleSelectReply.selectedRowId || m.listResponseMessage.title;
+      } else if (m.interactiveResponseMessage) {
+        const resp = m.interactiveResponseMessage;
+        try {
+          if (resp.nativeFlowResponseMessage?.paramsJson) {
+            const parsed = JSON.parse(resp.nativeFlowResponseMessage.paramsJson);
+            text = parsed.id || parsed.display_text || resp.body?.text || '';
+          } else {
+            text = resp.body?.text || '';
+          }
+        } catch (e) {
+          text = resp.body?.text || '';
+        }
+      } else if (m.imageMessage?.caption) {
+        text = m.imageMessage.caption;
+      } else if (m.videoMessage?.caption) {
+        text = m.videoMessage.caption;
+      } else if (m.documentMessage?.caption) {
+        text = m.documentMessage.caption;
+      } else if (m.imageMessage) {
+        text = '[Photo]';
+      } else if (m.audioMessage) {
+        text = '[Voice Note]';
+      } else if (m.videoMessage) {
+        text = '[Video]';
+      } else if (m.documentMessage) {
+        text = '[Document]';
+      } else if (m.contactMessage || m.contactsArrayMessage) {
+        text = '[Contact Card]';
+      } else if (m.locationMessage || m.liveLocationMessage) {
+        text = '[Location]';
+      }
+
+      return text ? text.trim() : '';
+    }
+
     // Listen for incoming customer messages & button responses (STOP, ENQUIRE, replies)
     sock.ev.on('messages.upsert', async (m) => {
-      if (m.type !== 'notify') return;
-      for (const msg of m.messages) {
-        if (!msg.message || msg.key.fromMe) continue; // Skip messages sent by ourselves
+      // Process both real-time 'notify' and synchronized/catch-up 'append' events
+      const messagesList = m.messages || [];
+      for (const msg of messagesList) {
+        if (!msg.message) continue;
         const remoteJid = msg.key.remoteJid || '';
-        if (!remoteJid.endsWith('@s.whatsapp.net')) continue; // Strictly allow individual customer chats only (no groups or newsletters)
-        
-        const phone = remoteJid.split('@')[0].split(':')[0];
-        let text = '';
-        if (msg.message.conversation) {
-          text = msg.message.conversation;
-        } else if (msg.message.extendedTextMessage?.text) {
-          text = msg.message.extendedTextMessage.text;
-        } else if (msg.message.buttonsResponseMessage?.selectedButtonId) {
-          text = msg.message.buttonsResponseMessage.selectedButtonId;
-        } else if (msg.message.templateButtonReplyMessage?.selectedId) {
-          text = msg.message.templateButtonReplyMessage.selectedId;
-        } else if (msg.message.listResponseMessage?.singleSelectReply?.selectedRowId) {
-          text = msg.message.listResponseMessage.singleSelectReply.selectedRowId;
-        } else if (msg.message.interactiveResponseMessage) {
-          const resp = msg.message.interactiveResponseMessage;
-          try {
-            if (resp.nativeFlowResponseMessage?.paramsJson) {
-              const parsed = JSON.parse(resp.nativeFlowResponseMessage.paramsJson);
-              text = parsed.id || parsed.display_text || resp.body?.text;
-            } else {
-              text = resp.body?.text;
-            }
-          } catch (e) {
-            text = resp.body?.text;
-          }
-        }
+        if (!isDirectChat(remoteJid)) continue; // Strictly allow individual customer chats only (no groups or newsletters)
 
+        const text = extractMessageContent(msg.message);
         if (!text) continue;
-        console.log(`[WhatsApp Gateway] Inbound message from +${phone}: "${text}"`);
+
+        const phone = await resolvePhoneFromJid(remoteJid, msg);
+        if (!phone) continue;
+
+        const isFromMe = !!msg.key.fromMe;
+        console.log(`[WhatsApp Gateway] ${isFromMe ? 'Outbound (phone sync)' : 'Inbound'} message with +${phone}: "${text}"`);
 
         // Forward to FastAPI backend webhook
         try {
@@ -112,19 +199,21 @@ async function initWhatsApp(forceNew = false) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Gateway-Secret': 'local_gateway_secure_token_123'
+              'X-Gateway-Secret': 'local_gateway_secure_token_123',
             },
             body: JSON.stringify({
               phone,
               text,
               message_id: msg.key.id,
               timestamp: msg.messageTimestamp,
+              is_from_me: isFromMe,
+              remote_jid: remoteJid,
             }),
           });
           const data = await resp.json();
-          
-          // Send automatic reply on WhatsApp if triggered (e.g. for STOP unsubscribe or ENQUIRE confirmation)
-          if (data?.auto_reply) {
+
+          // Send automatic reply on WhatsApp if triggered (only for customer inbound messages)
+          if (!isFromMe && data?.auto_reply) {
             console.log(`[WhatsApp Gateway] Auto-replying to +${phone}: "${data.auto_reply}"`);
             await sock.sendMessage(remoteJid, { text: data.auto_reply });
           }
@@ -141,7 +230,9 @@ async function initWhatsApp(forceNew = false) {
         // 3 = DELIVERY_ACK (Delivered ✓✓), 4 = READ (Read/Blue Tick ✓✓)
         if (status === 3 || status === 4) {
           const remoteJid = update.key?.remoteJid || '';
-          const phone = remoteJid.split('@')[0].split(':')[0];
+          if (!isDirectChat(remoteJid)) continue;
+
+          const phone = await resolvePhoneFromJid(remoteJid, update);
           const messageId = update.key?.id;
           const statusStr = status === 4 ? 'read' : 'delivered';
 
@@ -150,7 +241,7 @@ async function initWhatsApp(forceNew = false) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'X-Gateway-Secret': 'local_gateway_secure_token_123'
+                'X-Gateway-Secret': 'local_gateway_secure_token_123',
               },
               body: JSON.stringify({ message_id: messageId, phone, status: statusStr }),
             });
