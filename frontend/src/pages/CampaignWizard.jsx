@@ -741,26 +741,35 @@ export const CampaignWizard = () => {
                     {/* Interactive Action Buttons */}
                     {buttons && buttons.length > 0 && (
                       <div className="border-t border-slate-200/60 dark:border-emerald-800/40 divide-y divide-slate-200/60 dark:divide-emerald-800/40 bg-white/40 dark:bg-black/20">
-                        {buttons.map((btn, idx) => (
-                          <div
-                            key={idx}
-                            className="py-2 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-1.5"
-                          >
-                            {btn.action === 'stop' ? (
-                              <span className="text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1">
-                                🛑 {btn.text}
-                              </span>
-                            ) : btn.action === 'enquire' ? (
-                              <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
-                                🔥 {btn.text}
-                              </span>
-                            ) : (
-                              <span className="text-sky-600 dark:text-sky-400 flex items-center gap-1">
-                                ↗ {btn.text}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                        {buttons.map((btn, idx) => {
+                          const isStop = btn.action === 'stop' || btn.text?.toLowerCase() === 'stop';
+                          const isEnquire = btn.action === 'enquire' || btn.text?.toLowerCase() === 'enquire';
+                          const isUrl = btn.type === 'url' || btn.url;
+                          return (
+                            <div
+                              key={idx}
+                              className="py-2 px-3 text-center text-xs font-medium flex items-center justify-center gap-1.5"
+                            >
+                              {isStop ? (
+                                <span className="text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1">
+                                  🛑 {btn.text} <span className="text-[10px] opacity-75 font-normal">(Opt-Out)</span>
+                                </span>
+                              ) : isEnquire ? (
+                                <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
+                                  🔥 {btn.text} <span className="text-[10px] opacity-75 font-normal">(Capture Lead)</span>
+                                </span>
+                              ) : isUrl ? (
+                                <span className="text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                                  ↗ {btn.text}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
+                                  🔘 {btn.text}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -860,18 +869,35 @@ export const CampaignWizard = () => {
               </div>
               {buttons && buttons.length > 0 && (
                 <div className="border-t border-slate-200 dark:border-slate-700/60 divide-y divide-slate-200 dark:divide-slate-700/60 bg-slate-100/60 dark:bg-slate-900/40">
-                  {buttons.map((btn, idx) => (
-                    <div
-                      key={idx}
-                      className="py-1.5 px-3 text-center text-xs font-semibold text-emerald-600 dark:text-emerald-400"
-                    >
-                      {btn.action === 'stop'
-                        ? `🛑 ${btn.text} (Auto Opt-Out)`
-                        : btn.action === 'enquire'
-                        ? `🔥 ${btn.text} (Capture Lead)`
-                        : `↗ ${btn.text} (URL Link)`}
-                    </div>
-                  ))}
+                  {buttons.map((btn, idx) => {
+                    const isStop = btn.action === 'stop' || btn.text?.toLowerCase() === 'stop';
+                    const isEnquire = btn.action === 'enquire' || btn.text?.toLowerCase() === 'enquire';
+                    const isUrl = btn.type === 'url' || btn.url;
+                    return (
+                      <div
+                        key={idx}
+                        className="py-1.5 px-3 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+                      >
+                        {isStop ? (
+                          <span className="text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                            🛑 {btn.text} <span className="text-[10px] opacity-75 font-normal">(Opt-Out)</span>
+                          </span>
+                        ) : isEnquire ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            🔥 {btn.text} <span className="text-[10px] opacity-75 font-normal">(Capture Lead)</span>
+                          </span>
+                        ) : isUrl ? (
+                          <span className="text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                            ↗ {btn.text}
+                          </span>
+                        ) : (
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            🔘 {btn.text}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

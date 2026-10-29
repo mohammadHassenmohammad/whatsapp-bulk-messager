@@ -721,19 +721,38 @@ export const CampaignQueue = () => {
                   <div className="border-t border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700 bg-slate-100/60 dark:bg-slate-900/40">
                     {(() => {
                       try {
-                        const parsed = JSON.parse(campaign.buttons_json);
-                        return parsed.map((btn, idx) => (
-                          <div
-                            key={idx}
-                            className="py-1.5 px-3 text-center text-xs font-semibold text-emerald-600 dark:text-emerald-400"
-                          >
-                            {btn.action === 'stop'
-                              ? `🛑 ${btn.text} (Auto Opt-Out)`
-                              : btn.action === 'enquire'
-                              ? `🔥 ${btn.text} (Capture Lead)`
-                              : `↗ ${btn.text} (URL Link)`}
-                          </div>
-                        ));
+                        const parsed = typeof campaign.buttons_json === 'string'
+                          ? JSON.parse(campaign.buttons_json)
+                          : campaign.buttons_json;
+                        return parsed.map((btn, idx) => {
+                          const isStop = btn.action === 'stop' || btn.text?.toLowerCase() === 'stop';
+                          const isEnquire = btn.action === 'enquire' || btn.text?.toLowerCase() === 'enquire';
+                          const isUrl = btn.type === 'url' || btn.url;
+                          return (
+                            <div
+                              key={idx}
+                              className="py-2 px-3 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+                            >
+                              {isStop ? (
+                                <span className="text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                                  🛑 {btn.text} <span className="text-[10px] font-normal text-slate-400">(Quick Reply: Opt-Out)</span>
+                                </span>
+                              ) : isEnquire ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                  🔥 {btn.text} <span className="text-[10px] font-normal text-slate-400">(Quick Reply: Lead)</span>
+                                </span>
+                              ) : isUrl ? (
+                                <span className="text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                                  ↗ {btn.text} <span className="text-[10px] font-normal text-slate-400">({btn.url})</span>
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                  🔘 {btn.text} <span className="text-[10px] font-normal text-slate-400">(Quick Reply)</span>
+                                </span>
+                              )}
+                            </div>
+                          );
+                        });
                       } catch (e) {
                         return null;
                       }

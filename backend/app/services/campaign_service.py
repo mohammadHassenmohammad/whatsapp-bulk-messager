@@ -13,6 +13,11 @@ from backend.app.services.template_service import render_template
 from backend.app.schemas.schemas import CampaignCreate
 
 def format_buttons_footer(body: str, buttons_json: Optional[str]) -> str:
+    """
+    Appends URL action links to the message body if present.
+    Quick-reply buttons (e.g. ENQUIRE, STOP) are kept as interactive buttons
+    and are NOT injected as plain-text lines into the message body.
+    """
     if not buttons_json:
         return body
     try:
@@ -26,11 +31,9 @@ def format_buttons_footer(body: str, buttons_json: Optional[str]) -> str:
             b_url = (b.get("url") or "").strip()
             if b_type == "url" and b_url:
                 lines.append(f"🔗 *{b_text}*: {b_url}")
-            elif b_text:
-                lines.append(f"👉 Reply *{b_text}*")
         if lines:
             if lines[0] not in body:
-                return f"{body.strip()}\n\n──────────────────\n" + "\n".join(lines)
+                return f"{body.strip()}\n\n" + "\n".join(lines)
     except Exception:
         pass
     return body
