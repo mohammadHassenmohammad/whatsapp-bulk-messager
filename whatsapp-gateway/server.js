@@ -258,113 +258,56 @@ app.post('/api/session/disconnect', async (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Helper: Dispatch native interactive buttons or standard message fallback
+// Helper: Dispatch message and native interactive quick reply buttons
 async function sendInteractiveOrStandardMessage(sock, jid, { text, mediaUrl, buttons }) {
-  if (buttons && Array.isArray(buttons) && buttons.length > 0) {
-    try {
-      const nativeButtons = buttons.map((b, idx) => {
-        const bText = (b.text || '').trim();
-        const bType = b.type || (b.action === 'url' ? 'url' : 'quick_reply');
-        const bUrl = b.url || '';
-
-        if ((bType === 'url' || b.action === 'url') && bUrl) {
-          return {
-            name: 'cta_url',
-            buttonParamsJson: JSON.stringify({
-              display_text: bText,
-              url: bUrl,
-              merchant_url: bUrl,
-            }),
-          };
-        } else {
-          return {
-            name: 'quick_reply',
-            buttonParamsJson: JSON.stringify({
-              display_text: bText,
-              id: (b.id || b.action || `btn_${idx}_${bText}`).toString(),
-            }),
-          };
-        }
-      });
-
-      // Strip previously appended text button footer if present so it doesn't duplicate
-      let cleanBody = text || '';
-      const dividerIdx = cleanBody.indexOf('\n\n──────────────────\n');
-      if (dividerIdx !== -1) {
-        cleanBody = cleanBody.substring(0, dividerIdx).trim();
-      }
-
-      let header = { hasMediaAttachment: false };
-      if (mediaUrl) {
-        try {
-          const mediaMsg = await prepareWAMessageMedia(
-            { image: { url: mediaUrl } },
-            { upload: sock.waUploadToServer }
-          );
-          header = {
-            hasMediaAttachment: true,
-            imageMessage: mediaMsg.imageMessage,
-          };
-        } catch (mediaErr) {
-          console.warn('[WhatsApp Gateway] Media preparation error for interactive header:', mediaErr.message);
-        }
-      }
-
-      const interactiveMessage = proto.Message.InteractiveMessage.create({
-        body: proto.Message.InteractiveMessage.Body.create({
-          text: cleanBody,
-        }),
-        header: proto.Message.InteractiveMessage.Header.create(header),
-        nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-          buttons: nativeButtons,
-        }),
-      });
-
-      const messageContent = generateWAMessageFromContent(
-        jid,
-        {
-          viewOnceMessage: {
-            message: {
-              messageContextInfo: {
-                deviceListMetadata: {},
-                deviceListMetadataVersion: 2,
-              },
-              interactiveMessage: interactiveMessage,
-            },
-          },
-        },
-        {}
-      );
-
-      await sock.relayMessage(jid, messageContent.message, {
-        messageId: messageContent.key.id,
-      });
-
-      return { key: messageContent.key };
-    } catch (err) {
-      console.warn('[WhatsApp Gateway] Native button dispatch error, falling back to text format:', err.message);
-    }
+  // Strip any legacy plain-text button footer so text remains clean
+  let cleanBody = text || '';
+  const dividerIdx = cleanBody.indexOf('\n\n──────────────────\n');
+  if (dividerIdx !== -1) {
+    cleanBody = cleanBody.substring(0, dividerIdx).trim();
   }
 
-  // Fallback or standard send without interactive buttons
-  let finalMsg = text;
-  if (buttons && Array.isArray(buttons) && buttons.length > 0) {
-    const btnLines = buttons.map((b) =>
-      b.type === 'url' && b.url ? `🔗 *${b.text}*: ${b.url}` : `👉 Reply *${b.text}*`
-    );
-    if (!finalMsg.includes(btnLines[0])) {
-      finalMsg = `${finalMsg.trim()}\n\n──────────────────\n${btnLines.join('\n')}`;
-    }
+  // Handle URL buttons as clickable preview links
+  const urlButtons = (buttons || []).filter(
+    (b) => (b.type === 'url' || b.action === 'url') && b.url
+  );
+  if (urlButtons.length > 0) {
+    const urlLines = urlButtons.map((b) => `🔗 *${b.text}*: ${b.url}`);
+    cleanBody = `${cleanBody}\n\n${urlLines.join('\n')}`;
   }
 
+  // 1. Send main message (with media/image attachment if provided)
+  let result;
   if (mediaUrl) {
-    return await sock.sendMessage(jid, {
+    result = await sock.sendMessage(jid, {
       image: { url: mediaUrl },
-      caption: finalMsg,
+      caption: cleanBody,
     });
   } else {
-    return await sock.sendMessage(jid, { text: finalMsg });
+    result = await sock.sendMessage(jid, { text: cleanBody });
   }
+
+  // 2. Send native interactive Quick Reply buttons via WhatsApp Poll (100% supported across all WhatsApp clients)
+  const quickReplies = (buttons || [])
+    .filter((b) => b.type === 'quick_reply' || b.action === 'quick_reply' || (!b.type && !b.url))
+    .map((b) => (b.text || '').trim())
+    .filter(Boolean);
+
+  if (quickReplies.length > 0) {
+    try {
+      await sock.sendMessage(jid, {
+        poll: {
+          name: '👉 Quick Reply — Tap an option below:',
+          values: quickReplies,
+          selectableCount: 1,
+        },
+      });
+    } catch (pollErr) {
+      console.warn('[WhatsApp Gateway] Quick reply poll dispatch error:', pollErr.message);
+    }
+  }
+
+  return result;
 }
 
 // Send single message (text, native buttons, or image with caption)

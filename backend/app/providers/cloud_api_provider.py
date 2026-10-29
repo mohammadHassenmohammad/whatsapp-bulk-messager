@@ -106,6 +106,33 @@ class WhatsAppCloudProvider(BaseMessagingProvider):
                     "components": []
                 }
             }
+        elif payload.buttons and not payload.template_name:
+            cloud_buttons = []
+            for idx, b in enumerate(payload.buttons[:3]):  # Meta allows max 3 quick-reply buttons
+                b_text = b.get("text", "")[:20]
+                b_id = b.get("id") or f"btn_{idx}_{b_text}"
+                cloud_buttons.append({
+                    "type": "reply",
+                    "reply": {
+                        "id": str(b_id),
+                        "title": str(b_text)
+                    }
+                })
+            data = {
+                "messaging_product": "whatsapp",
+                "to": clean_recipient,
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    "body": {"text": payload.text},
+                    "action": {"buttons": cloud_buttons}
+                }
+            }
+            if payload.media_url:
+                data["interactive"]["header"] = {
+                    "type": "image",
+                    "image": {"link": payload.media_url}
+                }
         elif payload.media_url:
             data = {
                 "messaging_product": "whatsapp",
