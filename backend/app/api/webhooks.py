@@ -94,17 +94,21 @@ def handle_incoming_message(
             conversation.last_message_at = now
             conversation.updated_at = now
 
-        msg_entry = Message(
-            conversation_id=conversation.id,
-            customer_id=customer_id,
-            direction="outbound",
-            sender_type="user",
-            body=text,
-            provider_message_id=message_id,
-            delivery_status="sent",
-            created_at=now
-        )
-        db.add(msg_entry)
+        existing_outbound = None
+        if message_id:
+            existing_outbound = db.query(Message).filter(Message.provider_message_id == message_id).first()
+        if not existing_outbound:
+            msg_entry = Message(
+                conversation_id=conversation.id,
+                customer_id=customer_id,
+                direction="outbound",
+                sender_type="user",
+                body=text,
+                provider_message_id=message_id,
+                delivery_status="sent",
+                created_at=now
+            )
+            db.add(msg_entry)
         db.commit()
         return {"status": "success", "action": "outbound_synced"}
 
@@ -262,18 +266,22 @@ def handle_incoming_message(
             conversation.customer_name = customer_name
         conversation.updated_at = now
 
-    # Add Message item
-    msg_entry = Message(
-        conversation_id=conversation.id,
-        customer_id=customer_id,
-        direction="inbound",
-        sender_type="customer",
-        body=text,
-        provider_message_id=message_id,
-        delivery_status="read",
-        created_at=now
-    )
-    db.add(msg_entry)
+    # Add Message item (deduplicated)
+    existing_inbound = None
+    if message_id:
+        existing_inbound = db.query(Message).filter(Message.provider_message_id == message_id).first()
+    if not existing_inbound:
+        msg_entry = Message(
+            conversation_id=conversation.id,
+            customer_id=customer_id,
+            direction="inbound",
+            sender_type="customer",
+            body=text,
+            provider_message_id=message_id,
+            delivery_status="read",
+            created_at=now
+        )
+        db.add(msg_entry)
 
     # If auto-reply is generated, also record it into conversation thread
     if auto_reply:

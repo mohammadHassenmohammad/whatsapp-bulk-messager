@@ -10,6 +10,7 @@ import {
   UserPlus,
   Upload,
   FilePlus,
+  FileText,
   ArrowRight,
   TrendingUp,
   AlertCircle,
@@ -107,6 +108,7 @@ export const Overview = () => {
     total_failed = 0,
     total_inquiries = 0,
     new_inquiries = 0,
+    total_templates = 0,
     tasks_due_today = 0,
     tasks_overdue = 0,
     customer_growth = [],
@@ -219,10 +221,10 @@ export const Overview = () => {
           color="purple"
         />
         <StatCard
-          title="Tasks Due / Late"
-          value={`${tasks_due_today} / ${tasks_overdue}`}
-          subtext="Today vs overdue"
-          icon={Clock}
+          title="Templates"
+          value={total_templates}
+          subtext="Saved outreach templates"
+          icon={FileText}
           color="rose"
         />
         <StatCard

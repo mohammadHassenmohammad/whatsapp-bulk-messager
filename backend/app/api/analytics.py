@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from backend.app.database import get_db
 from backend.app.models.models import (
-    Customer, Category, Campaign, CampaignRecipient, CustomerInquiry, FollowUpTask
+    Customer, Category, Campaign, CampaignRecipient, CustomerInquiry, FollowUpTask, MessageTemplate
 )
 from backend.app.schemas.schemas import AnalyticsOverview
 
@@ -32,6 +32,7 @@ def get_analytics(
     total_categories = db.query(Category).count()
     total_campaigns = db.query(Campaign).count()
     active_campaigns_count = db.query(Campaign).filter(Campaign.status == "in_progress").count()
+    total_templates = db.query(MessageTemplate).count()
 
     # Recipient status totals
     recipient_stats = db.query(
@@ -170,6 +171,7 @@ def get_analytics(
         total_failed=total_failed,
         total_inquiries=total_inquiries,
         new_inquiries=new_inquiries,
+        total_templates=total_templates,
         tasks_due_today=tasks_due_today,
         tasks_overdue=tasks_overdue,
         customer_growth=customer_growth,

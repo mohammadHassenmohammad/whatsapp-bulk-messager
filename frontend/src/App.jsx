@@ -50,8 +50,8 @@ export default function App() {
                   <Route path="campaigns/:id" element={<CampaignDetail />} />
                   <Route path="templates" element={<Templates />} />
 
-                  {/* 5. Tasks & Automations */}
-                  <Route path="tasks" element={<Tasks />} />
+                  {/* 5. Templates (Replaced legacy tasks & automation) */}
+                  <Route path="tasks" element={<Navigate to="/templates" replace />} />
 
                   {/* 6. Reports */}
                   <Route path="reports" element={<Analytics />} />

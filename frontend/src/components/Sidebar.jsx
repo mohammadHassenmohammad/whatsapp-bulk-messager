@@ -46,7 +46,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
     },
     { name: 'Campaigns', to: '/campaigns', icon: Send },
-    { name: 'Tasks & Automations', to: '/tasks', icon: CheckSquare },
+    { name: 'Templates', to: '/templates', icon: FileText },
     { name: 'Reports', to: '/reports', icon: BarChart3 },
     { name: 'Settings', to: '/settings', icon: Settings },
   ];

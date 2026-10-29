@@ -278,6 +278,7 @@ class AnalyticsOverview(BaseModel):
     total_failed: int = 0
     total_inquiries: int = 0
     new_inquiries: int = 0
+    total_templates: int = 0
     tasks_due_today: int = 0
     tasks_overdue: int = 0
     customer_growth: List[Dict[str, Any]]

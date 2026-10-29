@@ -398,40 +398,75 @@ export const Inbox = () => {
                   <p className="text-xs text-slate-500">Send a reply below to initiate conversation.</p>
                 </div>
               ) : (
-                selectedConv.messages.map((msg) => {
-                  const isOutbound = msg.direction === 'outbound';
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${isOutbound ? 'items-end' : 'items-start'}`}
-                    >
+                (() => {
+                  const uniqueMessages = (selectedConv.messages || []).filter(
+                    (msg, idx, arr) =>
+                      idx ===
+                      arr.findIndex(
+                        (m) =>
+                          m.id === msg.id ||
+                          (m.body === msg.body &&
+                            m.direction === msg.direction &&
+                            Math.abs(new Date(m.created_at) - new Date(msg.created_at)) < 60000)
+                      )
+                  );
+
+                  return uniqueMessages.map((msg) => {
+                    const isOutbound = msg.direction === 'outbound';
+                    return (
                       <div
-                        className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-xs ${
-                          isOutbound
-                            ? 'bg-emerald-600 text-white rounded-br-xs'
-                            : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-xs'
-                        }`}
+                        key={msg.id}
+                        className={`flex flex-col ${isOutbound ? 'items-end' : 'items-start'}`}
                       >
-                        {msg.sender_type === 'auto_reply' && (
-                          <span className="text-[10px] tracking-wider uppercase font-bold block mb-1 text-emerald-200">
-                            ⚡ Automated Bot Reply
-                          </span>
-                        )}
-                        <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.body}</p>
                         <div
-                          className={`text-[10px] mt-1.5 flex items-center justify-end gap-1 ${
-                            isOutbound ? 'text-emerald-100' : 'text-slate-400'
+                          className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-xs ${
+                            isOutbound
+                              ? 'bg-emerald-600 text-white rounded-br-xs'
+                              : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-xs'
                           }`}
                         >
-                          <span>
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {isOutbound && getDeliveryIcon(msg.delivery_status)}
+                          {/* Sender Type Badges */}
+                          {msg.sender_type === 'auto_reply' && (
+                            <span className="text-[10px] tracking-wider uppercase font-bold block mb-1 text-emerald-200">
+                              ⚡ Automated Reply
+                            </span>
+                          )}
+                          {msg.sender_type === 'campaign' && (
+                            <span className="text-[10px] tracking-wider uppercase font-bold block mb-1 text-emerald-100/80">
+                              📢 Campaign Broadcast
+                            </span>
+                          )}
+                          {!isOutbound && (
+                            <span className="text-[10px] tracking-wider uppercase font-bold block mb-1 text-emerald-600 dark:text-emerald-400">
+                              👤 {selectedConv.customer_name || 'Customer'}
+                            </span>
+                          )}
+
+                          {/* Media Attachment */}
+                          {msg.media_url && (
+                            <img
+                              src={msg.media_url}
+                              alt="Attachment"
+                              className="rounded-xl max-h-56 w-auto object-cover mb-2 border border-black/10"
+                            />
+                          )}
+
+                          <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.body}</p>
+                          <div
+                            className={`text-[10px] mt-1.5 flex items-center justify-end gap-1 ${
+                              isOutbound ? 'text-emerald-100' : 'text-slate-400'
+                            }`}
+                          >
+                            <span>
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {isOutbound && getDeliveryIcon(msg.delivery_status)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  });
+                })()
               )}
               <div ref={messagesEndRef} />
             </div>

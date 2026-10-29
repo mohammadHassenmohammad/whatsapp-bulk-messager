@@ -350,10 +350,18 @@ def update_recipient_queue_status(
                     conv.customer_name = recipient.recipient_name
                 conv.updated_at = now
 
-            existing_msg = db.query(Message).filter(
-                Message.conversation_id == conv.id,
-                Message.provider_message_id == message_id
-            ).first() if message_id else None
+            existing_msg = None
+            if message_id:
+                existing_msg = db.query(Message).filter(
+                    Message.conversation_id == conv.id,
+                    Message.provider_message_id == message_id
+                ).first()
+            if not existing_msg:
+                existing_msg = db.query(Message).filter(
+                    Message.conversation_id == conv.id,
+                    Message.direction == "outbound",
+                    Message.body == (recipient.personalized_message or "Campaign message sent")
+                ).first()
 
             if not existing_msg:
                 outbound_msg = Message(
