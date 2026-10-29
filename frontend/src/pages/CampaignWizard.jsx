@@ -169,6 +169,15 @@ export const CampaignWizard = () => {
     setMessageBody((prev) => prev + ` {${varName}}`);
   };
 
+  const getMissingVariables = () => {
+    if (!selectionPreview?.sample_recipients?.length) return [];
+    const current = selectionPreview.sample_recipients[previewIndex] || selectionPreview.sample_recipients[0];
+    const missing = [];
+    if (/\{company\}/i.test(messageBody) && !current.company) missing.push('{company}');
+    if (/\{category\}/i.test(messageBody) && !current.category) missing.push('{category}');
+    return missing;
+  };
+
   const renderSampleRecipientMessage = () => {
     if (!selectionPreview || !selectionPreview.sample_recipients || selectionPreview.sample_recipients.length === 0) {
       return messageBody;
@@ -681,6 +690,15 @@ export const CampaignWizard = () => {
                     </div>
                   )}
                 </div>
+
+                {getMissingVariables().length > 0 && (
+                  <div className="mb-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>
+                      Notice: <strong>{getMissingVariables().join(', ')}</strong> is empty for this recipient and will be blank in their message.
+                    </span>
+                  </div>
+                )}
 
                 <div className="min-h-[260px] p-4 rounded-2xl bg-[#e5ddd5] dark:bg-[#0b141a] border border-slate-200 dark:border-slate-800 flex flex-col justify-end overflow-y-auto">
                   <div className="self-end max-w-[90%] bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef] rounded-2xl rounded-tr-xs shadow-sm text-xs leading-relaxed overflow-hidden">

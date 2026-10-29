@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, desc, asc
 
 from backend.app.database import get_db
-from backend.app.models.models import Customer, Category
+from backend.app.models.models import Customer, Category, ConsentAuditLog
 from backend.app.schemas.schemas import (
     CustomerCreate, CustomerUpdate, CustomerResponse, CustomerListResponse,
     ImportPreviewResponse, ColumnMapping, ImportConfirmRequest, ImportResult
@@ -23,6 +23,7 @@ def get_customers(
     search: Optional[str] = None,
     category_id: Optional[int] = None,
     consent_status: Optional[str] = None,
+    lead_stage: Optional[str] = None,
     tag: Optional[str] = None,
     is_suppressed: Optional[bool] = None,
     page: int = Query(1, ge=1),
@@ -53,6 +54,9 @@ def get_customers(
     if consent_status:
         query = query.filter(Customer.consent_status == consent_status)
 
+    if lead_stage and lead_stage != "all":
+        query = query.filter(Customer.lead_stage == lead_stage)
+
     if tag:
         query = query.filter(Customer.tags.ilike(f"%{tag.strip()}%"))
 
@@ -82,6 +86,7 @@ def get_customers(
             category_name=c.category.name if c.category else None,
             company=c.company,
             tags=c.tags,
+            lead_stage=c.lead_stage or "New",
             consent_status=c.consent_status,
             consent_source=c.consent_source,
             consent_date=c.consent_date,
@@ -217,18 +222,45 @@ def update_customer(id: int, payload: CustomerUpdate, db: Session = Depends(get_
             cust.category_id = payload.category_id
     if payload.tags is not None:
         cust.tags = payload.tags.strip() if payload.tags else None
-    if payload.consent_status is not None:
-        cust.consent_status = payload.consent_status
-        if payload.consent_status == "opted_out":
+    if payload.consent_status is not None and payload.consent_status != cust.consent_status:
+        old_status = cust.consent_status
+        new_status = payload.consent_status
+        cust.consent_status = new_status
+        if new_status == "opted_out":
             cust.is_suppressed = True
+        elif new_status == "verified":
+            cust.is_suppressed = False
+            cust.consent_date = datetime.now(timezone.utc)
+
+        audit_entry = ConsentAuditLog(
+            customer_id=cust.id,
+            phone=cust.phone,
+            action="consent_updated",
+            previous_status=old_status,
+            new_status=new_status,
+            source=payload.consent_source or "Manual UI Update",
+            reason=f"Consent manually updated to {new_status}"
+        )
+        db.add(audit_entry)
+
     if payload.consent_source is not None:
         cust.consent_source = payload.consent_source
     if payload.consent_date is not None:
         cust.consent_date = payload.consent_date
-    if payload.is_suppressed is not None:
+    if payload.is_suppressed is not None and payload.is_suppressed != cust.is_suppressed:
         cust.is_suppressed = payload.is_suppressed
         if cust.is_suppressed and cust.consent_status != "opted_out":
             cust.consent_status = "opted_out"
+            audit_entry = ConsentAuditLog(
+                customer_id=cust.id,
+                phone=cust.phone,
+                action="suppressed",
+                previous_status=cust.consent_status,
+                new_status="opted_out",
+                source="Manual UI Suppression",
+                reason="Customer suppressed manually"
+            )
+            db.add(audit_entry)
     if payload.notes is not None:
         cust.notes = payload.notes.strip() if payload.notes else None
 
@@ -357,19 +389,41 @@ def bulk_categorize(payload: dict, db: Session = Depends(get_db)):
 def bulk_update_consent(payload: dict, db: Session = Depends(get_db)):
     customer_ids = payload.get("customer_ids", [])
     consent_status = payload.get("consent_status", "unverified")
+    allow_unsuppress_opted_out = bool(payload.get("confirm_opt_in", False))
     if not customer_ids:
         raise HTTPException(status_code=400, detail="No customer IDs provided")
 
     is_suppressed = (consent_status == "opted_out")
-    updated = db.query(Customer).filter(Customer.id.in_(customer_ids)).update(
-        {
-            Customer.consent_status: consent_status,
-            Customer.is_suppressed: is_suppressed
-        },
-        synchronize_session=False
-    )
+    now = datetime.now(timezone.utc)
+    
+    customers_to_update = db.query(Customer).filter(Customer.id.in_(customer_ids)).all()
+    updated_count = 0
+
+    for cust in customers_to_update:
+        # Non-negotiable safeguard: do not silently unsuppress an opted-out contact unless explicit confirm_opt_in is passed
+        if cust.consent_status == "opted_out" and consent_status != "opted_out" and not allow_unsuppress_opted_out:
+            continue
+
+        old_status = cust.consent_status
+        cust.consent_status = consent_status
+        cust.is_suppressed = is_suppressed
+        if consent_status == "verified":
+            cust.consent_date = now
+
+        audit = ConsentAuditLog(
+            customer_id=cust.id,
+            phone=cust.phone,
+            action="bulk_consent_updated",
+            previous_status=old_status,
+            new_status=consent_status,
+            source="Bulk Consent Update",
+            reason=f"Bulk action set status to {consent_status}"
+        )
+        db.add(audit)
+        updated_count += 1
+
     db.commit()
-    return {"updated_count": updated}
+    return {"updated_count": updated_count}
 
 @router.post("/bulk/delete")
 def bulk_delete(payload: dict, db: Session = Depends(get_db)):

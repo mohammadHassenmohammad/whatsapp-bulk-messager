@@ -1,15 +1,33 @@
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from backend.app.models.models import (
     Customer, Category, MessageTemplate, Campaign, CampaignRecipient,
     CampaignActivityLog, AppSetting, CustomerInquiry, ConsentAuditLog,
-    Conversation, Message, FollowUpTask, Tag
+    Conversation, Message, FollowUpTask, Tag, customer_tags
 )
 
+def _get_utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
 def export_all_data(db: Session) -> Dict[str, Any]:
+    """
+    Exports a complete, schema-compliant snapshot of all data including CRM entities:
+    Categories, Tags, Customers, Templates, Campaigns, Inquiries, Conversations,
+    Messages, Follow-Up Tasks, Consent Audit Logs, and App Settings.
+    """
+    tags = [
+        {
+            "id": t.id,
+            "name": t.name,
+            "color": t.color,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in db.query(Tag).all()
+    ]
+
     categories = [
         {
             "id": c.id,
@@ -32,6 +50,7 @@ def export_all_data(db: Session) -> Dict[str, Any]:
             "category_id": c.category_id,
             "company": c.company,
             "tags": c.tags,
+            "tag_names": [t.name for t in c.tag_items] if c.tag_items else [],
             "lead_stage": getattr(c, "lead_stage", "New"),
             "consent_status": c.consent_status,
             "consent_source": c.consent_source,
@@ -70,6 +89,7 @@ def export_all_data(db: Session) -> Dict[str, Any]:
             "message_body_snapshot": cmp.message_body_snapshot,
             "header_media_url": cmp.header_media_url,
             "buttons_json": cmp.buttons_json,
+            "is_test_mode": getattr(cmp, "is_test_mode", False),
             "status": cmp.status,
             "total_recipients": cmp.total_recipients,
             "opened_count": cmp.opened_count,
@@ -128,6 +148,64 @@ def export_all_data(db: Session) -> Dict[str, Any]:
         for inq in db.query(CustomerInquiry).all()
     ]
 
+    conversations = []
+    for conv in db.query(Conversation).all():
+        messages = [
+            {
+                "id": m.id,
+                "direction": m.direction,
+                "sender_type": m.sender_type,
+                "body": m.body,
+                "media_url": m.media_url,
+                "provider_message_id": m.provider_message_id,
+                "delivery_status": m.delivery_status,
+                "error_message": m.error_message,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in conv.messages
+        ]
+        conversations.append({
+            "id": conv.id,
+            "customer_id": conv.customer_id,
+            "phone": conv.phone,
+            "customer_name": conv.customer_name,
+            "status": conv.status,
+            "assigned_to": conv.assigned_to,
+            "last_message_at": conv.last_message_at.isoformat() if conv.last_message_at else None,
+            "created_at": conv.created_at.isoformat() if conv.created_at else None,
+            "messages": messages
+        })
+
+    tasks = [
+        {
+            "id": t.id,
+            "customer_id": t.customer_id,
+            "title": t.title,
+            "description": t.description,
+            "due_date": t.due_date.isoformat() if t.due_date else None,
+            "priority": t.priority,
+            "status": t.status,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in db.query(FollowUpTask).all()
+    ]
+
+    consent_logs = [
+        {
+            "id": cl.id,
+            "customer_id": cl.customer_id,
+            "phone": cl.phone,
+            "action": cl.action,
+            "previous_status": cl.previous_status,
+            "new_status": cl.new_status,
+            "source": cl.source,
+            "reason": cl.reason,
+            "created_at": cl.created_at.isoformat() if cl.created_at else None,
+        }
+        for cl in db.query(ConsentAuditLog).all()
+    ]
+
     settings = [
         {
             "key": s.key,
@@ -139,21 +217,29 @@ def export_all_data(db: Session) -> Dict[str, Any]:
 
     return {
         "version": "2.0",
-        "exported_at": datetime.utcnow().isoformat(),
+        "exported_at": _get_utc_now_iso(),
+        "tags": tags,
         "categories": categories,
         "customers": customers,
         "templates": templates,
         "campaigns": campaigns,
         "inquiries": inquiries,
+        "conversations": conversations,
+        "tasks": tasks,
+        "consent_logs": consent_logs,
         "settings": settings
     }
 
 def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Safely wipes and restores all tables inside an ACID transaction, preserving
+    foreign key integrity and cross-references.
+    """
     if not isinstance(backup_data, dict) or "version" not in backup_data:
         raise ValueError("Invalid backup file format: missing version header")
 
-    # Clear existing data in transaction
     try:
+        # Clear existing data in correct topological foreign-key order
         db.query(Message).delete()
         db.query(Conversation).delete()
         db.query(FollowUpTask).delete()
@@ -162,12 +248,26 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
         db.query(CampaignActivityLog).delete()
         db.query(CampaignRecipient).delete()
         db.query(Campaign).delete()
+        db.execute(customer_tags.delete())
         db.query(Customer).delete()
         db.query(Category).delete()
+        db.query(Tag).delete()
         db.query(MessageTemplate).delete()
         db.query(AppSetting).delete()
         db.flush()
 
+        # 1. Tags
+        tag_map = {}
+        for t in backup_data.get("tags", []):
+            tag_obj = Tag(
+                name=t["name"],
+                color=t.get("color", "#64748b")
+            )
+            db.add(tag_obj)
+            db.flush()
+            tag_map[t["name"]] = tag_obj
+
+        # 2. Categories
         cat_id_map = {}
         for c in backup_data.get("categories", []):
             cat = Category(
@@ -179,9 +279,17 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
             db.flush()
             cat_id_map[c.get("id")] = cat.id
 
+        # 3. Customers
         cust_id_map = {}
         for cu in backup_data.get("customers", []):
             new_cat_id = cat_id_map.get(cu.get("category_id"))
+            c_date = None
+            if cu.get("consent_date"):
+                try:
+                    c_date = datetime.fromisoformat(cu["consent_date"])
+                except Exception:
+                    pass
+
             cust = Customer(
                 full_name=cu["full_name"],
                 phone=cu["phone"],
@@ -193,13 +301,20 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
                 lead_stage=cu.get("lead_stage", "New"),
                 consent_status=cu.get("consent_status", "unverified"),
                 consent_source=cu.get("consent_source"),
+                consent_date=c_date,
                 is_suppressed=bool(cu.get("is_suppressed", False)),
                 notes=cu.get("notes")
             )
+            # Re-associate tags
+            for t_name in cu.get("tag_names", []):
+                if t_name in tag_map:
+                    cust.tag_items.append(tag_map[t_name])
+
             db.add(cust)
             db.flush()
             cust_id_map[cu.get("id")] = cust.id
 
+        # 4. Templates
         tpl_id_map = {}
         for t in backup_data.get("templates", []):
             tpl = MessageTemplate(
@@ -215,6 +330,7 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
             db.flush()
             tpl_id_map[t.get("id")] = tpl.id
 
+        # 5. Campaigns & Recipients
         for cmp_data in backup_data.get("campaigns", []):
             cmp = Campaign(
                 name=cmp_data["name"],
@@ -224,6 +340,7 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
                 message_body_snapshot=cmp_data["message_body_snapshot"],
                 header_media_url=cmp_data.get("header_media_url"),
                 buttons_json=cmp_data.get("buttons_json"),
+                is_test_mode=bool(cmp_data.get("is_test_mode", False)),
                 status=cmp_data.get("status", "completed"),
                 total_recipients=cmp_data.get("total_recipients", 0),
                 opened_count=cmp_data.get("opened_count", 0),
@@ -256,6 +373,7 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
                 )
                 db.add(rec)
 
+        # 6. Customer Inquiries
         for inq_data in backup_data.get("inquiries", []):
             inq = CustomerInquiry(
                 customer_id=cust_id_map.get(inq_data.get("customer_id")),
@@ -269,6 +387,76 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
             )
             db.add(inq)
 
+        # 7. Follow-Up Tasks
+        for t_data in backup_data.get("tasks", []):
+            d_date = datetime.now(timezone.utc)
+            if t_data.get("due_date"):
+                try:
+                    d_date = datetime.fromisoformat(t_data["due_date"])
+                except Exception:
+                    pass
+            comp_date = None
+            if t_data.get("completed_at"):
+                try:
+                    comp_date = datetime.fromisoformat(t_data["completed_at"])
+                except Exception:
+                    pass
+
+            c_id = cust_id_map.get(t_data.get("customer_id"))
+            if c_id:
+                task = FollowUpTask(
+                    customer_id=c_id,
+                    title=t_data["title"],
+                    description=t_data.get("description"),
+                    due_date=d_date,
+                    priority=t_data.get("priority", "medium"),
+                    status=t_data.get("status", "pending"),
+                    completed_at=comp_date
+                )
+                db.add(task)
+
+        # 8. Conversations & Messages
+        for conv_data in backup_data.get("conversations", []):
+            conv = Conversation(
+                customer_id=cust_id_map.get(conv_data.get("customer_id")),
+                phone=conv_data["phone"],
+                customer_name=conv_data.get("customer_name", "Unknown"),
+                status=conv_data.get("status", "open"),
+                assigned_to=conv_data.get("assigned_to"),
+            )
+            db.add(conv)
+            db.flush()
+
+            for m_data in conv_data.get("messages", []):
+                msg = Message(
+                    conversation_id=conv.id,
+                    customer_id=conv.customer_id,
+                    direction=m_data.get("direction", "inbound"),
+                    sender_type=m_data.get("sender_type", "customer"),
+                    body=m_data.get("body", ""),
+                    media_url=m_data.get("media_url"),
+                    provider_message_id=m_data.get("provider_message_id"),
+                    delivery_status=m_data.get("delivery_status", "sent"),
+                    error_message=m_data.get("error_message")
+                )
+                db.add(msg)
+
+        # 9. Consent Audit Logs
+        for cl_data in backup_data.get("consent_logs", []):
+            c_id = cust_id_map.get(cl_data.get("customer_id"))
+            if c_id:
+                audit = ConsentAuditLog(
+                    customer_id=c_id,
+                    phone=cl_data.get("phone", ""),
+                    action=cl_data.get("action", "consent_updated"),
+                    previous_status=cl_data.get("previous_status"),
+                    new_status=cl_data.get("new_status", "unverified"),
+                    source=cl_data.get("source", "Backup Restore"),
+                    reason=cl_data.get("reason", "Restored from backup")
+                )
+                db.add(audit)
+
+        # 10. Settings
         for s in backup_data.get("settings", []):
             setting = AppSetting(
                 key=s["key"],
@@ -280,12 +468,14 @@ def restore_all_data(db: Session, backup_data: Dict[str, Any]) -> Dict[str, Any]
         db.commit()
         return {
             "success": True,
-            "message": "Data restored successfully",
+            "message": "All data restored successfully without data loss.",
             "categories_restored": len(backup_data.get("categories", [])),
             "customers_restored": len(backup_data.get("customers", [])),
             "templates_restored": len(backup_data.get("templates", [])),
             "campaigns_restored": len(backup_data.get("campaigns", [])),
-            "inquiries_restored": len(backup_data.get("inquiries", []))
+            "inquiries_restored": len(backup_data.get("inquiries", [])),
+            "conversations_restored": len(backup_data.get("conversations", [])),
+            "tasks_restored": len(backup_data.get("tasks", [])),
         }
     except Exception as e:
         db.rollback()

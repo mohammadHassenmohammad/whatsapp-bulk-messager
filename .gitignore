@@ -22,6 +22,7 @@ __pycache__/
 
 # Gateway Auth & Sessions
 whatsapp-gateway/baileys_auth_info/
+whatsapp-gateway/auth_info_baileys/
 
 # Frontend builds
 frontend/dist/

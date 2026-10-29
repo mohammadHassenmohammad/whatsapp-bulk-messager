@@ -22,6 +22,7 @@ class BaileysProvider(BaseMessagingProvider):
             requires_preapproved_templates=False,
             enforces_24h_service_window=False,
             max_recipients_per_batch=500,
+            supports_rate_pacing=True,
             supports_anti_ban_pacing=True
         )
 

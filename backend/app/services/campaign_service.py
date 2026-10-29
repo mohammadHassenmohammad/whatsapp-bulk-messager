@@ -1,5 +1,6 @@
 import json
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -287,7 +288,7 @@ def update_recipient_queue_status(
     if message_id:
         recipient.message_id = message_id
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if new_status == "opened":
         recipient.opened_at = now
     elif new_status == "sent":

@@ -29,12 +29,12 @@ class InactivityRequest(BaseModel):
 
 @router.get("/status")
 async def get_ai_status():
-    """Get status of local Ollama runtime vs. rule-based heuristic fallback."""
+    """Get status of the deterministic rule-based automation engine."""
     return await AIService.get_status()
 
 @router.post("/draft-template")
 async def draft_template(payload: DraftTemplateRequest):
-    """Generate a high-converting WhatsApp message template with opt-out clause."""
+    """Generate a compliant WhatsApp message template using deterministic copywriting rules."""
     return await AIService.draft_template(
         topic=payload.topic,
         tone=payload.tone or "professional",

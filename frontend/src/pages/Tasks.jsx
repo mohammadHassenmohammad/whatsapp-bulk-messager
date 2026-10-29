@@ -60,8 +60,8 @@ export const Tasks = () => {
 
   const fetchCustomers = async () => {
     try {
-      const res = await api.getCustomers({ limit: 100 });
-      setCustomers(res.customers || []);
+      const res = await api.getCustomers({ page_size: 200 });
+      setCustomers(res.items || []);
     } catch (err) {
       console.error('Failed to load customers:', err);
     }
@@ -221,21 +221,17 @@ export const Tasks = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
+              <Zap className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">Intelligence Mode</span>
-              <span className="text-sm font-bold text-slate-900 dark:text-white capitalize">
-                {aiStatus?.mode ? aiStatus.mode.replace('_', ' ') : 'Local Engine'}
+              <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">Rule Engine</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                Deterministic Logic
               </span>
             </div>
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-            aiStatus?.available
-              ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-          }`}>
-            {aiStatus?.available ? 'Ollama Online' : 'Heuristic Rules'}
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+            Rules Active
           </span>
         </div>
 

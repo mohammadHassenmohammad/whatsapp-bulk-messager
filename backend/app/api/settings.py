@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import get_db, DATABASE_URL
 from backend.app.models.models import (
-    AppSetting, Customer, Category, MessageTemplate, Campaign, CampaignRecipient, CampaignActivityLog
+    AppSetting, Customer, Category, MessageTemplate, Campaign, CampaignRecipient, CampaignActivityLog,
+    CustomerInquiry, ConsentAuditLog, Conversation, Message, FollowUpTask, Tag, customer_tags
 )
 from backend.app.services.backup_service import export_all_data, restore_all_data
 import json
@@ -85,14 +86,21 @@ def clear_all_data(payload: dict = Body(...), db: Session = Depends(get_db)):
         )
 
     try:
+        db.query(Message).delete()
+        db.query(Conversation).delete()
+        db.query(FollowUpTask).delete()
+        db.query(ConsentAuditLog).delete()
+        db.query(CustomerInquiry).delete()
         db.query(CampaignActivityLog).delete()
         db.query(CampaignRecipient).delete()
         db.query(Campaign).delete()
+        db.execute(customer_tags.delete())
         db.query(Customer).delete()
         db.query(Category).delete()
+        db.query(Tag).delete()
         db.query(MessageTemplate).delete()
         db.commit()
-        return {"success": True, "message": "All customer, category, template, and campaign data cleared."}
+        return {"success": True, "message": "All customer, CRM, category, template, and campaign data safely cleared."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,69 +1,33 @@
 import logging
-import os
 import re
 from typing import List, Dict, Any, Optional
-import httpx
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+class DeterministicRulesService:
+    """
+    100% Deterministic Rule-Based Automation Engine.
+    Operates locally with zero external AI models, cloud APIs, or Ollama dependencies.
+    """
 
-class AIService:
     @staticmethod
     async def get_status() -> Dict[str, Any]:
-        """Check if local Ollama runtime is reachable."""
-        try:
-            async with httpx.AsyncClient(timeout=1.5) as client:
-                res = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
-                if res.status_code == 200:
-                    data = res.json()
-                    models = [m.get("name") for m in data.get("models", [])]
-                    selected_model = DEFAULT_MODEL if DEFAULT_MODEL in models else (models[0] if models else DEFAULT_MODEL)
-                    return {
-                        "available": True,
-                        "url": OLLAMA_BASE_URL,
-                        "models": models,
-                        "active_model": selected_model,
-                        "mode": "local_ollama"
-                    }
-        except Exception as e:
-            logger.debug(f"Local Ollama is not accessible: {e}")
-
+        """Returns deterministic rule engine status."""
         return {
-            "available": False,
-            "url": OLLAMA_BASE_URL,
+            "available": True,
+            "mode": "deterministic_rules",
+            "active_model": "rule_based_engine",
+            "engine": "Deterministic Keyword & Pattern Matcher",
+            "ai_disabled": True,
             "models": [],
-            "active_model": "heuristic_rules",
-            "mode": "rule_based_fallback"
+            "supported_rules": [
+                "Exact Opt-Out Suppression ('STOP', 'CANCEL', 'UNSUBSCRIBE')",
+                "Exact Opt-In Re-consent ('START', 'SUBSCRIBE', 'RESUBSCRIBE')",
+                "Customer Enquiry & Lead Detection ('PRICE', 'DETAILS', 'QUOTE')",
+                "Issue & Complaint Routing ('PROBLEM', 'REFUND', 'ISSUE')",
+                "Inactivity Lead Hygiene"
+            ]
         }
-
-    @staticmethod
-    async def _query_ollama(prompt: str, system_prompt: str = "") -> Optional[str]:
-        """Execute a generation prompt against local Ollama."""
-        status = await AIService.get_status()
-        if not status["available"]:
-            return None
-
-        model = status["active_model"]
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                payload = {
-                    "model": model,
-                    "prompt": prompt,
-                    "system": system_prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.4,
-                        "num_predict": 256
-                    }
-                }
-                res = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload)
-                if res.status_code == 200:
-                    return res.json().get("response", "").strip()
-        except Exception as e:
-            logger.warning(f"Ollama generation failed, falling back to rules: {e}")
-        return None
 
     @classmethod
     async def draft_template(
@@ -72,103 +36,112 @@ class AIService:
         tone: str = "professional",
         customer_name_var: bool = True
     ) -> Dict[str, Any]:
-        """Draft a WhatsApp message template using Ollama or intelligent heuristics."""
-        prompt = (
-            f"Write a short, engaging WhatsApp message template for a business regarding: '{topic}'. "
-            f"Tone: {tone}. Keep it under 50 words. "
-            f"{'Include {{customer_name}} variable for personalization.' if customer_name_var else ''} "
-            f"Always include an unsubscribe option like: 'Reply STOP to opt out.' at the very end."
-        )
-        system = "You are an expert WhatsApp marketing copywriter creating compliant, high-converting direct messages."
+        """
+        Generates high-converting, compliant WhatsApp message copy using
+        deterministic copywriting patterns without any LLMs.
+        """
+        topic_clean = topic.strip()
+        topic_lower = topic_clean.lower()
+        greeting = "Hi {name},\n\n" if customer_name_var else "Hello,\n\n"
+        opt_out = "\n\nReply STOP to opt out."
 
-        ollama_res = await cls._query_ollama(prompt, system)
-        if ollama_res:
-            return {
-                "source": "ollama",
-                "template_text": ollama_res,
-                "variables": ["customer_name"] if "{{customer_name}}" in ollama_res else []
-            }
-
-        # Rule-based fallback templates
-        greeting = "Hi {{customer_name}}, " if customer_name_var else "Hello! "
-        if "offer" in topic.lower() or "sale" in topic.lower() or "discount" in topic.lower():
-            body = f"{greeting}we're excited to offer you a special update on {topic}! Don't miss out on exclusive pricing valid this week. Let us know if you'd like more details.\n\nReply STOP to opt out."
-        elif "reminder" in topic.lower() or "payment" in topic.lower() or "appointment" in topic.lower():
-            body = f"{greeting}this is a quick friendly reminder regarding {topic}. Please let us know if you have any questions or need to reschedule.\n\nReply STOP to opt out."
+        if any(w in topic_lower for w in ["offer", "sale", "discount", "promo", "deal", "special"]):
+            body = (
+                f"{greeting}We are pleased to share an exclusive update regarding {topic_clean}! "
+                f"For a limited time, enjoy special pricing available exclusively to our valued clients. "
+                f"Reply to this chat if you would like full details."
+                f"{opt_out}"
+            )
+        elif any(w in topic_lower for w in ["reminder", "appointment", "schedule", "renew", "due", "payment"]):
+            body = (
+                f"{greeting}This is a friendly reminder regarding your upcoming {topic_clean}. "
+                f"Please reply to this message if you need to confirm, make changes, or have any questions."
+                f"{opt_out}"
+            )
+        elif any(w in topic_lower for w in ["welcome", "onboard", "hello", "intro"]):
+            body = (
+                f"{greeting}Welcome! Thank you for connecting with us regarding {topic_clean}. "
+                f"Our team is here to assist you every step of the way. Feel free to reply anytime if you need help."
+                f"{opt_out}"
+            )
+        elif any(w in topic_lower for w in ["feedback", "review", "satisfaction", "survey"]):
+            body = (
+                f"{greeting}Thank you for your recent experience with {topic_clean}. "
+                f"Your feedback helps us serve you better. How would you rate our service today? Reply directly with your thoughts."
+                f"{opt_out}"
+            )
         else:
-            body = f"{greeting}thank you for being a valued customer. We wanted to share an important update regarding {topic}. Reply to this message anytime to chat with our team.\n\nReply STOP to opt out."
+            body = (
+                f"{greeting}Thank you for being a valued contact. We wanted to reach out regarding {topic_clean}. "
+                f"Please let us know if we can assist you with any questions or provide further information."
+                f"{opt_out}"
+            )
 
         return {
-            "source": "rules",
+            "source": "deterministic_rules",
             "template_text": body,
-            "variables": ["customer_name"] if customer_name_var else []
+            "variables": ["name"] if customer_name_var else []
         }
 
     @classmethod
     async def classify_reply(cls, message_text: str) -> Dict[str, Any]:
-        """Classify incoming WhatsApp replies into lead intent categories."""
+        """
+        Deterministically classifies incoming message intent using strict keyword sets.
+        """
         text_clean = message_text.strip().lower()
 
-        # Deterministic rule checks first for security and privacy compliance
-        if any(w in text_clean for w in ["stop", "unsubscribe", "opt out", "cancel", "remove", "block"]):
+        # 1. Opt-out keyword rule (Legal & Policy compliance)
+        if any(w in text_clean for w in ["stop", "unsubscribe", "opt out", "optout", "cancel", "remove", "block"]):
             return {"intent": "opt_out", "confidence": 1.0, "source": "rule_exact"}
 
-        if any(w in text_clean for w in ["start", "subscribe", "opt in", "resubscribe"]):
+        # 2. Re-consent / Opt-in rule
+        if any(w in text_clean for w in ["start", "subscribe", "opt in", "optin", "resubscribe"]):
             return {"intent": "opt_in", "confidence": 1.0, "source": "rule_exact"}
 
+        # 3. Complaints & Urgent issues
         if any(w in text_clean for w in ["issue", "problem", "broken", "fraud", "scam", "bad service", "complaint", "refund", "not working", "delayed"]):
-            return {"intent": "complaint", "confidence": 0.9, "source": "rule_keyword"}
+            return {"intent": "complaint", "confidence": 1.0, "source": "rule_keyword"}
 
-        if any(w in text_clean for w in ["price", "cost", "how much", "details", "info", "catalog", "brochure", "when", "send details", "interested", "yes", "call me"]):
-            return {"intent": "enquiry", "confidence": 0.95, "source": "rule_keyword"}
+        # 4. Enquiries & Purchase intent
+        if any(w in text_clean for w in ["price", "cost", "how much", "details", "info", "catalog", "brochure", "when", "send details", "interested", "yes", "call me", "order"]):
+            return {"intent": "enquiry", "confidence": 1.0, "source": "rule_keyword"}
 
+        # 5. Not interested / Disinterest
         if any(w in text_clean for w in ["no", "not interested", "dont want", "wrong number", "leave me alone"]):
-            return {"intent": "not_interested", "confidence": 0.9, "source": "rule_keyword"}
+            return {"intent": "not_interested", "confidence": 1.0, "source": "rule_keyword"}
 
-        # Try Ollama classification for ambiguous text
-        prompt = (
-            f"Classify the intent of this incoming WhatsApp message into exactly one of these categories: "
-            f"[enquiry, interested, complaint, not_interested, opt_out, general].\n"
-            f"Message: \"{message_text}\"\n"
-            f"Respond with only the category word."
-        )
-        ollama_res = await cls._query_ollama(prompt)
-        if ollama_res:
-            word = re.sub(r"[^a-zA-Z_]", "", ollama_res.lower().split()[0] if ollama_res.split() else "")
-            valid = ["enquiry", "interested", "complaint", "not_interested", "opt_out", "general"]
-            if word in valid:
-                return {"intent": word, "confidence": 0.85, "source": "ollama"}
-
-        return {"intent": "general", "confidence": 0.6, "source": "rule_default"}
+        return {"intent": "general", "confidence": 0.8, "source": "rule_default"}
 
     @classmethod
     async def suggest_replies(cls, last_message: str, customer_name: str = "") -> Dict[str, Any]:
-        """Suggest 3 quick response snippets."""
+        """
+        Suggests 3 context-aware, deterministic response templates.
+        """
         name_prefix = f"{customer_name.split()[0]}, " if customer_name else ""
         classification = await cls.classify_reply(last_message)
         intent = classification["intent"]
 
         if intent in ["enquiry", "interested"]:
             suggestions = [
-                f"Hi {name_prefix}thanks for reaching out! We would be delighted to help. What specific details can I provide for you?",
-                f"Hello {name_prefix}our pricing and catalog are attached. Would you like to schedule a quick 5-minute call today?",
+                f"Hi {name_prefix}thanks for reaching out! What specific details or pricing can I share with you?",
+                f"Hello {name_prefix}our catalog and current pricing details are available. Would you like to schedule a quick call today?",
                 f"Thank you for your interest! Let me connect you with our specialist right away."
             ]
         elif intent == "complaint":
             suggestions = [
-                f"Hi {name_prefix}I am truly sorry to hear about this issue. Could you please share your order/account number so I can resolve it immediately?",
-                f"We apologize for the inconvenience. Let me escalate this to our support supervisor right away.",
-                f"Thank you for bringing this to our attention. Let's get this sorted out for you right now."
+                f"Hi {name_prefix}I apologize for this inconvenience. Could you please share your order or account number so I can resolve this immediately?",
+                f"We are looking into this right away. Let me escalate this to our support team for priority resolution.",
+                f"Thank you for bringing this to our attention. Let us get this sorted out for you right now."
             ]
         elif intent == "not_interested":
             suggestions = [
-                f"No problem at all, {name_prefix}! Thank you for letting us know. Have a wonderful day ahead.",
-                f"Understood! We won't disturb you. Reply anytime if your needs change.",
-                f"Thank you for your time! Wishing you the best."
+                f"Understood, {name_prefix}! Thank you for letting us know. Have a wonderful day ahead.",
+                f"No problem at all! We won't send further updates. Reply anytime if your needs change.",
+                f"Thank you for your time! Wishing you all the best."
             ]
         else:
             suggestions = [
-                f"Hi {name_prefix}thank you for your message! How can we assist you today?",
+                f"Hi {name_prefix}thank you for your message! How can our team assist you today?",
                 f"Hello! Thanks for reaching out. Please let us know if you need any assistance.",
                 f"Got it! Let me know if you would like me to share more details."
             ]
@@ -181,29 +154,34 @@ class AIService:
 
     @classmethod
     async def summarize_thread(cls, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Summarize conversation history into key takeaway points."""
+        """
+        Deterministically summarizes chat transcripts into key factual metrics
+        without external LLMs.
+        """
         if not messages:
             return {"summary": "No messages in conversation yet.", "source": "empty"}
 
-        # Format message transcript
-        transcript_lines = []
-        for m in messages[-10:]:
-            sender = m.get("sender_type") or m.get("direction", "unknown")
-            body = m.get("body") or m.get("message_text", "")
-            transcript_lines.append(f"{sender}: {body}")
-        transcript = "\n".join(transcript_lines)
+        total_msgs = len(messages)
+        inbound = sum(1 for m in messages if m.get("direction") == "inbound")
+        outbound = sum(1 for m in messages if m.get("direction") == "outbound")
 
-        prompt = (
-            f"Summarize this customer WhatsApp interaction in 2 concise bullet points focusing on customer intent and next action:\n\n"
-            f"{transcript}"
+        last_msg = messages[-1]
+        last_body = last_msg.get("body") or last_msg.get("message_text", "")
+        last_sender = last_msg.get("sender_type") or last_msg.get("direction", "contact")
+
+        classification = await cls.classify_reply(last_body)
+        detected_intent = classification["intent"].replace("_", " ").title()
+
+        summary_text = (
+            f"• Thread status: {total_msgs} messages total ({inbound} inbound, {outbound} outbound).\n"
+            f"• Latest message from {last_sender}: '{last_body[:80]}...'\n"
+            f"• Detected customer intent: {detected_intent}."
         )
-        ollama_res = await cls._query_ollama(prompt)
-        if ollama_res:
-            return {"summary": ollama_res, "source": "ollama"}
 
-        # Fallback summary
-        last_m = messages[-1].get("body") or messages[-1].get("message_text", "")
         return {
-            "summary": f"Active conversation with {len(messages)} total messages. Latest interaction: '{last_m[:60]}...'",
-            "source": "heuristic"
+            "summary": summary_text,
+            "source": "deterministic_rules"
         }
+
+# Backwards compatibility alias
+AIService = DeterministicRulesService

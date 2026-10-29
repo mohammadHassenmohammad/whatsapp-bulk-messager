@@ -70,10 +70,10 @@ export const Templates = () => {
       });
       if (res?.template_text) {
         setFormData((prev) => ({ ...prev, body: res.template_text }));
-        toast.success(`Draft generated via ${res.source === 'ollama' ? 'Local Ollama AI' : 'Smart Rule Engine'}`);
+        toast.success('Draft generated via Rule Engine');
       }
     } catch (err) {
-      toast.error('AI draft generation failed');
+      toast.error('Template drafting failed');
     } finally {
       setDraftingAi(false);
     }
@@ -496,7 +496,7 @@ export const Templates = () => {
                 className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-200 dark:border-indigo-800 transition"
               >
                 <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                <span>{draftingAi ? 'Drafting...' : 'AI Auto-Draft'}</span>
+                <span>{draftingAi ? 'Drafting...' : 'Rule-Based Draft'}</span>
               </button>
             </div>
             <WhatsAppMessageEditor

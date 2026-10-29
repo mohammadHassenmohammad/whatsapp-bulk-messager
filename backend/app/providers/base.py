@@ -13,6 +13,7 @@ class ProviderCapabilities:
     requires_preapproved_templates: bool = False
     enforces_24h_service_window: bool = False
     max_recipients_per_batch: int = 1000
+    supports_rate_pacing: bool = True
     supports_anti_ban_pacing: bool = True
 
 @dataclass

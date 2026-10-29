@@ -28,6 +28,14 @@ let connectionStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'qr_re
 let connectedUser = null;
 let activeBulkJob = null; // To track ongoing auto-send campaigns
 
+function saveBulkJobState() {
+  if (activeBulkJob) {
+    try {
+      fs.writeFileSync(path.join(AUTH_DIR, 'active_bulk_job.json'), JSON.stringify(activeBulkJob, null, 2));
+    } catch (e) {}
+  }
+}
+
 const logger = pino({ level: 'silent' });
 
 async function initWhatsApp(forceNew = false) {
@@ -299,6 +307,7 @@ app.post('/api/messages/send-bulk', async (req, res) => {
     isPaused: false,
     isCancelled: false,
   };
+  saveBulkJobState();
 
   // Run bulk dispatcher in background asynchronously
   (async () => {
@@ -337,6 +346,7 @@ app.post('/api/messages/send-bulk', async (req, res) => {
           result = await sock.sendMessage(jid, { text: finalMsg });
         }
         activeBulkJob.sent += 1;
+        saveBulkJobState();
         const messageKeyId = result?.key?.id;
 
         // Notify FastAPI backend of confirmed send + store message_id for delivery receipt tracking
@@ -356,6 +366,7 @@ app.post('/api/messages/send-bulk', async (req, res) => {
       } catch (err) {
         console.error(`Failed to send to ${cleanPhone}:`, err.message);
         activeBulkJob.failed += 1;
+        saveBulkJobState();
         try {
           await fetch(`http://127.0.0.1:8090/api/campaigns/${campaignId}/recipients/${rec.id}/status`, {
             method: 'PUT',
@@ -417,6 +428,12 @@ app.post('/api/messages/cancel-bulk', (req, res) => {
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`[WhatsApp Gateway] Running on http://127.0.0.1:${PORT} (bound to loopback only)`);
+  // Attempt to restore existing bulk job state if available
+  if (fs.existsSync(path.join(AUTH_DIR, 'active_bulk_job.json'))) {
+    try {
+      activeBulkJob = JSON.parse(fs.readFileSync(path.join(AUTH_DIR, 'active_bulk_job.json'), 'utf8'));
+    } catch (e) {}
+  }
   // Attempt to restore existing session if available
   if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) {
     initWhatsApp(false);

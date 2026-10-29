@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, Table
+    Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, Table, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from backend.app.database import Base
@@ -146,6 +146,11 @@ class CampaignRecipient(Base):
 
     campaign = relationship("Campaign", back_populates="recipients")
     customer = relationship("Customer", back_populates="campaign_recipients")
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "recipient_phone", name="uq_campaign_recipient_phone"),
+        Index("ix_campaign_recipient_lookup", "campaign_id", "recipient_phone"),
+    )
 
 class CampaignActivityLog(Base):
     __tablename__ = "campaign_activity_logs"

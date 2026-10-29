@@ -18,9 +18,9 @@ router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 WEBHOOK_SECRET = os.getenv("GATEWAY_WEBHOOK_SECRET", "local_gateway_secure_token_123")
 
 def verify_gateway_secret(x_gateway_secret: Optional[str] = Header(None)):
-    # If gateway secret is enforced and provided, verify it
-    if x_gateway_secret and x_gateway_secret != WEBHOOK_SECRET:
-        raise HTTPException(status_code=401, detail="Invalid gateway webhook secret")
+    # Strictly enforce gateway secret to prevent unauthorized forged inbound events
+    if not x_gateway_secret or x_gateway_secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid or missing gateway webhook secret")
     return True
 
 @router.post("/incoming")

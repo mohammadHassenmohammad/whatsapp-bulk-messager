@@ -262,18 +262,24 @@ class SettingsMap(BaseModel):
 
 class AnalyticsOverview(BaseModel):
     total_customers: int
+    eligible_contacts_count: int = 0
     verified_consent_count: int
     unverified_consent_count: int
     opted_out_count: int
     total_categories: int
     total_campaigns: int
+    active_campaigns_count: int = 0
     total_chats_opened: int
     total_confirmed_sents: int
     total_delivered: int = 0
     total_read: int = 0
+    total_replied: int = 0
     total_skipped: int
+    total_failed: int = 0
     total_inquiries: int = 0
     new_inquiries: int = 0
+    tasks_due_today: int = 0
+    tasks_overdue: int = 0
     customer_growth: List[Dict[str, Any]]
     category_distribution: List[Dict[str, Any]]
     campaign_timeline: List[Dict[str, Any]]

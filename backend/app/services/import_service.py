@@ -4,7 +4,7 @@ import uuid
 from typing import Dict, Any, List, Optional
 import pandas as pd
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 from backend.app.models.models import Customer, Category
 from backend.app.services.phone_service import normalize_phone
@@ -194,9 +194,16 @@ def process_import(
                 if cat_id: existing.category_id = cat_id
                 if tags_val: existing.tags = tags_val
                 if notes_val: existing.notes = notes_val
-                existing.consent_status = consent_status
-                existing.is_suppressed = is_suppressed
-                existing.updated_at = datetime.utcnow()
+
+                # Non-negotiable safeguard: Never let a normal CSV import silently override a recorded opt-out
+                if existing.consent_status == "opted_out" or existing.is_suppressed:
+                    # Keep opt-out status locked unless the customer explicitly completes auditable re-consent
+                    pass
+                else:
+                    existing.consent_status = consent_status
+                    existing.is_suppressed = is_suppressed
+
+                existing.updated_at = datetime.now(timezone.utc)
                 updated += 1
             else:
                 skipped += 1
@@ -212,7 +219,7 @@ def process_import(
                 tags=tags_val or None,
                 consent_status=consent_status,
                 consent_source="Import",
-                consent_date=datetime.utcnow() if consent_status == "verified" else None,
+                consent_date=datetime.now(timezone.utc) if consent_status == "verified" else None,
                 is_suppressed=is_suppressed,
                 notes=notes_val or None
             )

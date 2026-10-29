@@ -339,11 +339,11 @@ export const Inbox = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleSummarizeThread}
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30 hover:bg-indigo-100 transition"
-                  title="Summarize thread with local AI"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  title="Generate deterministic thread summary"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>AI Summary</span>
+                  <span>Thread Summary</span>
                 </button>
 
                 <button
@@ -434,11 +434,11 @@ export const Inbox = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* AI Quick Response Chips */}
+            {/* Quick Response Chips */}
             {aiSuggestions.length > 0 && (
               <div className="px-6 py-2 bg-slate-100/70 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto">
                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                  <Sparkles className="w-3 h-3 text-emerald-500" /> Suggested:
+                  <Sparkles className="w-3 h-3 text-emerald-500" /> Quick Replies:
                 </span>
                 {aiSuggestions.map((sugg, idx) => (
                   <button
