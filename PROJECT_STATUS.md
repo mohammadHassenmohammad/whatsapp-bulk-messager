@@ -86,3 +86,4 @@ npm run build --prefix "c:\Users\mdfay\OneDrive\Desktop\whatsapp software\fronte
 3. Import contacts via CSV/Excel under **Contacts & Leads** -> **Import Contacts**.
 4. Review outreach templates and launch campaigns in **Campaigns** -> **New Campaign**.
 5. Manage customer queries and follow-up tasks in **Inbox** and **Tasks & Automations**.
+

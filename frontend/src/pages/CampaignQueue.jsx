@@ -382,10 +382,11 @@ export const CampaignQueue = () => {
     );
   }
 
-  const total = campaign.total_recipients;
-  const sent = campaign.sent_count;
-  const skipped = campaign.skipped_count;
-  const processed = sent + skipped;
+  const total = campaign.total_recipients || 0;
+  const sent = campaign.sent_count || 0;
+  const skipped = campaign.skipped_count || 0;
+  const failed = campaign.failed_count || campaign.recipients?.filter((r) => r.status === 'failed').length || 0;
+  const processed = sent + skipped + failed;
   const progressPercent = total > 0 ? Math.round((processed / total) * 100) : 0;
 
   return (
@@ -440,6 +441,13 @@ export const CampaignQueue = () => {
               style={{ width: `${total > 0 ? (skipped / total) * 100 : 0}%` }}
               title="Skipped"
             ></div>
+            {failed > 0 && (
+              <div
+                className="bg-rose-500 transition-all duration-300"
+                style={{ width: `${total > 0 ? (failed / total) * 100 : 0}%` }}
+                title="Failed"
+              ></div>
+            )}
           </div>
           <div className="flex items-center gap-4 text-[11px] text-slate-500 mt-2">
             <span className="flex items-center gap-1.5">
@@ -726,12 +734,25 @@ export const CampaignQueue = () => {
                 <span>Skip Recipient</span>
               </button>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Manual Click-to-Chat Button */}
+                <button
+                  type="button"
+                  onClick={handleOpenWhatsApp}
+                  disabled={autoSending}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 rounded-xl transition-all shadow-xs disabled:opacity-40"
+                  title="Open official WhatsApp wa.me link with prefilled message"
+                >
+                  <ExternalLink className="w-4 h-4 text-emerald-600" />
+                  <span>Open WhatsApp Chat</span>
+                </button>
+
                 {/* Send Directly Button */}
                 <button
+                  type="button"
                   onClick={handleSendDirectSingle}
                   disabled={isUpdating || autoSending}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl transition-all shadow-sm disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl transition-all shadow-sm disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
                   <span>
@@ -745,9 +766,10 @@ export const CampaignQueue = () => {
 
                 {/* Mark as Sent */}
                 <button
+                  type="button"
                   onClick={() => setMarkSentModal(true)}
                   disabled={autoSending}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border rounded-xl hover:bg-slate-50 transition-all disabled:opacity-40"
+                  className="inline-flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 transition-all disabled:opacity-40"
                 >
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Mark as Sent</span>

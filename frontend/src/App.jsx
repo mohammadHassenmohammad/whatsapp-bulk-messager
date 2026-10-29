@@ -27,7 +27,7 @@ export default function App() {
       <ThemeProvider>
         <ToastProvider>
           <QuickChatProvider>
-            <HashRouter>
+            <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
                 <Route path="/" element={<DashboardLayout />}>
                   {/* 1. Overview */}
