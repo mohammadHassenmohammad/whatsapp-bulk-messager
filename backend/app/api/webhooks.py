@@ -266,6 +266,27 @@ def handle_incoming_message(
             conversation.customer_name = customer_name
         conversation.updated_at = now
 
+    # If contact received a campaign message, attach it as the preceding message for context
+    if recent_recipient and recent_recipient.personalized_message:
+        existing_campaign_msg = db.query(Message).filter(
+            Message.conversation_id == conversation.id,
+            Message.sender_type == "campaign"
+        ).first()
+        if not existing_campaign_msg:
+            camp_msg_time = recent_recipient.confirmed_sent_at or recent_recipient.created_at or now
+            camp_outbound = Message(
+                conversation_id=conversation.id,
+                customer_id=customer_id,
+                direction="outbound",
+                sender_type="campaign",
+                body=recent_recipient.personalized_message,
+                media_url=recent_recipient.media_url,
+                provider_message_id=recent_recipient.message_id,
+                delivery_status=recent_recipient.status if recent_recipient.status in ["delivered", "read"] else "sent",
+                created_at=camp_msg_time
+            )
+            db.add(camp_outbound)
+
     # Add Message item (deduplicated)
     existing_inbound = None
     if message_id:

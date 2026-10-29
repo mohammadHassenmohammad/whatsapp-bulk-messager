@@ -147,7 +147,10 @@ def get_conversations(
     search: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Conversation)
+    # Strictly only show contacts who have given a reply to our messages (or sent an inbound inquiry)
+    query = db.query(Conversation).filter(
+        Conversation.messages.any(Message.direction == "inbound")
+    )
     if status and status != "all":
         query = query.filter(Conversation.status == status)
     if search:

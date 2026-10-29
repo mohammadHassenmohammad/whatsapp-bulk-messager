@@ -54,8 +54,13 @@ export const Inbox = () => {
         search: searchQuery ? searchQuery.trim() : undefined,
       });
       setConversations(data || []);
-      if (data && data.length > 0 && !selectedConvId) {
-        setSelectedConvId(data[0].id);
+      if (data && data.length > 0) {
+        if (!selectedConvId || !data.some((c) => c.id === selectedConvId)) {
+          setSelectedConvId(data[0].id);
+        }
+      } else {
+        setSelectedConvId(null);
+        setSelectedConv(null);
       }
     } catch (err) {
       console.error('Failed to load conversations:', err);
@@ -248,8 +253,10 @@ export const Inbox = () => {
           ) : conversations.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm space-y-2">
               <FolderOpen className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-              <p>No conversations found</p>
-              <span className="text-xs text-slate-500">Inbound replies via WhatsApp will appear here automatically.</span>
+              <p className="font-semibold text-slate-700 dark:text-slate-300">No customer replies yet</p>
+              <span className="text-xs text-slate-500 max-w-xs block mx-auto leading-relaxed">
+                Contacts who reply to your messages will automatically appear here in real time.
+              </span>
             </div>
           ) : (
             conversations.map((conv) => {

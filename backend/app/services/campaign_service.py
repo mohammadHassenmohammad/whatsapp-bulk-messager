@@ -322,60 +322,6 @@ def update_recipient_queue_status(
         recipient.opened_at = now
     elif new_status == "sent":
         recipient.confirmed_sent_at = now
-        # Also ensure unified Conversation and Message exist for this recipient in CRM Inbox
-        clean_recipient_phone = re.sub(r"\D", "", recipient.recipient_phone or "")
-        if clean_recipient_phone:
-            conv = db.query(Conversation).filter(
-                (Conversation.phone == clean_recipient_phone) |
-                (Conversation.phone.ilike(f"%{clean_recipient_phone[-10:]}"))
-            ).first()
-            if not conv:
-                conv = Conversation(
-                    customer_id=recipient.customer_id,
-                    phone=clean_recipient_phone,
-                    customer_name=recipient.recipient_name or f"WhatsApp User (+{clean_recipient_phone[-10:]})",
-                    status="waiting_reply",
-                    last_message_at=now,
-                    created_at=now,
-                    updated_at=now
-                )
-                db.add(conv)
-                db.flush()
-            else:
-                conv.last_message_at = now
-                conv.status = "waiting_reply"
-                if recipient.customer_id and not conv.customer_id:
-                    conv.customer_id = recipient.customer_id
-                if recipient.recipient_name and not conv.customer_name:
-                    conv.customer_name = recipient.recipient_name
-                conv.updated_at = now
-
-            existing_msg = None
-            if message_id:
-                existing_msg = db.query(Message).filter(
-                    Message.conversation_id == conv.id,
-                    Message.provider_message_id == message_id
-                ).first()
-            if not existing_msg:
-                existing_msg = db.query(Message).filter(
-                    Message.conversation_id == conv.id,
-                    Message.direction == "outbound",
-                    Message.body == (recipient.personalized_message or "Campaign message sent")
-                ).first()
-
-            if not existing_msg:
-                outbound_msg = Message(
-                    conversation_id=conv.id,
-                    customer_id=recipient.customer_id,
-                    direction="outbound",
-                    sender_type="campaign",
-                    body=recipient.personalized_message or "Campaign message sent",
-                    media_url=recipient.media_url,
-                    provider_message_id=message_id,
-                    delivery_status="sent",
-                    created_at=now
-                )
-                db.add(outbound_msg)
     elif new_status == "delivered":
         recipient.delivered_at = now
         if not recipient.confirmed_sent_at:
