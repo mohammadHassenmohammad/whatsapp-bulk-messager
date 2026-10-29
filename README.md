@@ -1,228 +1,174 @@
-# WhatsApp Campaign Manager — Free, Local-First Web Application
+# WhatsApp Campaign Manager — Free, Local-First Application
 
-A privacy-focused, zero-subscription dashboard for managing customer contacts, audience categories, personalized message templates, and manual WhatsApp outreach queues.
+A privacy-focused, zero-subscription dashboard for managing customer contacts, audience categories, personalized message templates, and WhatsApp outreach queues.
 
-Built with a **React (Vite) + Tailwind CSS** frontend and a **Python (FastAPI) + SQLite** backend.
-
----
-
-## 🌟 Key Features
-
-- **Local-First & Zero Paid APIs**: No WhatsApp Cloud API subscription or third-party paid aggregators required. All customer data and campaign records remain stored locally on your machine in SQLite (`whatsapp_campaign.db`).
-- **Official Click-to-Chat Format**: Adheres strictly to the official WhatsApp URL standard (`https://wa.me/<number>?text=<url_encoded_text>`).
-- **Guided CSV & Excel Importer**: Drag-and-drop file upload, intelligent column mapping auto-detection, phone number normalization, duplicate prevention, and CSV formula injection sanitization.
-- **Audience Categorization & Tags**: Group contacts into custom categories (New Leads, VIP, Retail, etc.) with custom color coding and reassignment safeguards.
-- **Dynamic Message Templates**: Insert variables such as `{name}`, `{company}`, `{category}`, and `{phone}` with live WhatsApp chat bubble simulation and character count.
-- **Multi-Step Campaign Wizard**:
-  1. Campaign details and internal notes.
-  2. Audience selection with automated opt-out suppression and strict consent filters.
-  3. Template composition and real-time per-recipient message preview.
-  4. Final review and compliance acknowledgement.
-- **Manual Sending Queue**:
-  - One-by-one dispatch review cards.
-  - One-click launch of WhatsApp Web or desktop with prefilled text.
-  - Explicit "Mark as Sent" confirmation with timestamps.
-  - "Skip Recipient" and "Cancel Campaign" actions.
-- **Campaign History & Detail Reports**: Full timeline records, status tracking (`prepared`, `opened`, `sent`, `skipped`), and downloadable CSV export reports.
-- **Analytics & Observability**: Real charts built with Recharts displaying audience growth, category distribution, and queue progress without fabricated delivery or read rates.
-- **Backup & Restore**: Instant full JSON database export and schema-validated restore with transaction safety.
+Built with a **React (Vite) + Tailwind CSS** frontend, a **Python (FastAPI) + SQLite** backend, and an optional **Node.js/Baileys** local linked gateway.
 
 ---
 
-## ⚠️ Important WhatsApp & Compliance Notice
+## 🌟 Key Architecture & Principles
 
-- **Manual Review Required**: Opening a chat via `wa.me` pre-fills the message in WhatsApp Web or the WhatsApp desktop client. You must review and press the send button in WhatsApp yourself.
-- **No Automatic Delivery Guarantees**: Opening a chat or clicking "Mark as Sent" records your manual outreach confirmation in the local database. It does not interface with WhatsApp internal delivery status.
-- **Safe Outreach Practices**: WhatsApp enforces platform guidelines against unsolicited spam. Always ensure your contacts have consented to receive messages. This software does not implement CAPTCHA bypass, automation concealment, or account rotation workarounds.
-
----
-
-## 🚀 Quick Start Guide (Windows PowerShell)
-
-### Prerequisites
-
-Ensure you have installed:
-1. **Python 3.10+**: Download from [python.org](https://www.python.org/downloads/) (Check *"Add python.exe to PATH"* during installation).
-2. **Node.js 18+ & npm**: Download from [nodejs.org](https://nodejs.org/).
+- **100% Local-First & Zero Paid Subscriptions**: All customer records, campaign history, messages, and analytics remain stored locally on your machine in SQLite (`whatsapp_campaign.db`).
+- **Zero AI / Deterministic Business Logic**: No Ollama, no local LLMs, no OpenAI/Anthropic/Gemini APIs, and no AI copilots. All message templates, intent classification, suggestions, and auto-replies use deterministic rule-based algorithms.
+- **Dual Sending Modes**:
+  - **Manual Click-to-Chat Mode**: Adheres strictly to the official WhatsApp URL standard (`https://wa.me/<number>?text=<url_encoded_text>`). Opening a link pre-fills the message; explicit user confirmation is tracked with timestamps.
+  - **Automated Linked-Session Gateway (Baileys)**: Local Node.js background gateway on `127.0.0.1:3050`. Links to your phone via standard WhatsApp Web multi-device QR code. Includes rate pacing, bounded retry limits, state persistence, and webhook security.
+- **Strict Webhook Security**: Gateway-to-backend webhooks require `X-Gateway-Secret` authentication.
+- **Relational Integrity & Auto-Migrations**: SQLite foreign-key enforcement is enabled on all connections. Database migrations run automatically on startup to update schemas without data loss. Full database integrity verified via `PRAGMA integrity_check`.
+- **Consent & Compliance Guardrails**: Opt-out keywords (`STOP`, `UNSUBSCRIBE`) automatically flag contacts as suppressed, block further campaign queueing, log audit trails in `consent_audit_logs`, and cannot be overridden by routine CSV imports.
 
 ---
 
-### Step 1: Open PowerShell in Project Directory
+## 🚀 Quick Start (Windows)
 
+### Option A: One-Click Startup (Recommended)
+
+Simply double-click:
+```cmd
+start.bat
+```
+or run in PowerShell:
 ```powershell
-cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software"
+.\start.ps1
 ```
 
----
-
-### Step 2: Set Up Backend (FastAPI + SQLite)
-
-1. Create a Python virtual environment:
-   ```powershell
-   python -m venv backend\venv
-   ```
-
-2. Activate the virtual environment:
-   ```powershell
-   .\backend\venv\Scripts\Activate.ps1
-   ```
-
-3. Install backend dependencies:
-   ```powershell
-   pip install -r backend\requirements.txt
-   ```
-
-4. Run the backend server (runs on `http://127.0.0.1:8090`):
-   ```powershell
-   uvicorn backend.app.main:app --host 127.0.0.1 --port 8090 --reload
-   ```
+This launches all three services bound to loopback:
+1. **Backend API**: `http://127.0.0.1:8090` (FastAPI + SQLite)
+2. **WhatsApp Gateway**: `http://127.0.0.1:3050` (Baileys Multi-Device)
+3. **Frontend Dashboard**: `http://localhost:5180` (React Vite)
 
 ---
 
-### Step 3: Set Up Frontend (React + Vite)
+### Option B: Manual Startup
 
-Open a **second PowerShell window**:
+#### Prerequisites
+1. **Python 3.10+**: Download from [python.org](https://www.python.org/downloads/) (ensure *"Add python.exe to PATH"* is checked).
+2. **Node.js 18+ & npm**: Download from [nodejs.org](https://nodejs.org/).
 
-1. Navigate to the `frontend` folder:
-   ```powershell
-   cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software\frontend"
-   ```
+#### 1. Backend Setup (PowerShell Window 1)
+```powershell
+cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software"
+.\backend\venv\Scripts\Activate.ps1
+uvicorn backend.app.main:app --host 127.0.0.1 --port 8090
+```
 
-2. Install npm packages:
-   ```powershell
-   npm install
-   ```
-
-3. Start the development server (runs on `http://localhost:5180`):
-   ```powershell
-   npm run dev
-   ```
-
-4. Open your browser and navigate to:
-   ```
-   http://localhost:5180/
-   ```
-
----
-
-### Step 4: Run WhatsApp Web Gateway (For 100% Automated Background Sending)
-
-Open a **third PowerShell window**:
-
+#### 2. WhatsApp Gateway Setup (PowerShell Window 2)
 ```powershell
 cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software\whatsapp-gateway"
 node server.js
 ```
-*The WhatsApp Web Gateway runs on `http://127.0.0.1:3050`.*
 
-Once running:
-1. Click **"Link WhatsApp (QR)"** in the top navigation bar of the web app.
-2. Scan the displayed QR code with your phone (WhatsApp → Linked Devices).
-3. Once linked, the top bar turns green: `🟢 WhatsApp: +<your_number>`.
-4. In any campaign queue, click **"⚡ Start Auto-Send"** to send to all recipients in the background automatically!
-
----
-
-## 🧪 Running Unit Tests
-
-The backend includes a comprehensive test suite covering phone number normalization, click-to-chat encoding, CSV formula sanitization, personalization rendering, opt-out suppression, queue state transitions, and database backup/restore:
-
+#### 3. Frontend Setup (PowerShell Window 3)
 ```powershell
-cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software"
-.\backend\venv\Scripts\pytest
+cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software\frontend"
+npm run dev
 ```
 
-All 14 tests will execute against SQLite in-memory databases with full isolation.
+Navigate to **`http://localhost:5180/`** in your browser.
 
 ---
 
-## 📁 Project Structure
+## 🧪 Automated Test Suite
+
+The backend includes a comprehensive 34-test suite covering:
+- Database backup/restore CRM persistence and foreign-key constraints
+- CSV formula sanitization and opt-out suppression safeguards
+- Webhook `X-Gateway-Secret` authentication enforcement
+- Customer lead stage serialization and query filtering
+- Deterministic copywriting and intent rules engine (zero AI)
+- Campaign recipient unique constraints and queue state transitions
+- Phone number normalization (E.164 and international formats)
+- Dynamic template variable extraction and rendering
+
+To run all tests:
+```powershell
+cd "c:\Users\mdfay\OneDrive\Desktop\whatsapp software"
+.\backend\venv\Scripts\pytest backend/tests -v
+```
+
+**Result:** `34 passed in ~2.5s`
+
+---
+
+## 📁 Repository Structure
 
 ```
 whatsapp-campaign-manager/
 ├── backend/
 │   ├── app/
-│   │   ├── api/             # FastAPI routers (customers, categories, templates, campaigns, analytics, settings)
-│   │   ├── models/          # SQLAlchemy database models
-│   │   ├── schemas/         # Pydantic v2 validation models
-│   │   ├── services/        # Business logic (phone_service, template_service, import_service, campaign_service)
-│   │   ├── database.py      # SQLite connection & session management
+│   │   ├── api/             # FastAPI endpoints (customers, campaigns, analytics, crm, ai, etc.)
+│   │   ├── models/          # SQLAlchemy relational models
+│   │   ├── providers/       # Baileys & Cloud API provider abstractions
+│   │   ├── schemas/         # Pydantic v2 schemas
+│   │   ├── services/        # Business logic & DeterministicRulesService
+│   │   ├── database.py      # SQLite connection, FK pragmas & auto-migrations
 │   │   └── main.py          # FastAPI application entrypoint & default seeders
-│   ├── tests/               # Pytest suite
-│   ├── requirements.txt     # Python dependencies
-│   └── venv/                # Python virtual environment
+│   ├── tests/               # 34 automated unit and integration tests
+│   └── requirements.txt     # Python dependencies
 ├── frontend/
 │   ├── src/
-│   │   ├── components/      # Badges, StatCards, Modals, ConfirmDialogs, Sidebar, Navbar
+│   │   ├── components/      # UI components, modals, sidebar, navbar
 │   │   ├── context/         # ToastContext & ThemeContext
-│   │   ├── layouts/         # DashboardLayout
-│   │   ├── pages/           # Overview, Customers, ImportContacts, Categories, Templates, CampaignWizard, CampaignQueue, CampaignHistory, CampaignDetail, Analytics, Settings
-│   │   ├── services/        # api.js API client
-│   │   ├── App.jsx          # Route configuration
-│   │   ├── main.jsx         # React DOM entrypoint
-│   │   └── index.css        # Tailwind styling & scrollbars
+│   │   ├── pages/           # Overview, Customers, CampaignWizard, Inbox, Tasks, Analytics
+│   │   └── services/        # Real backend API client (api.js)
 │   ├── package.json
-│   ├── vite.config.js       # Vite config with API proxy
-│   └── tailwind.config.js
-├── sample_contacts.csv      # Sample spreadsheet for testing imports
-├── pytest.ini
-├── .env.example
+│   └── vite.config.js       # Vite configuration with proxy to backend
+├── whatsapp-gateway/
+│   ├── server.js            # Node.js Baileys multi-device gateway
+│   ├── package.json
+│   └── active_bulk_job.json # Persisted bulk job state for crash recovery
+├── start.bat                # 1-Click Windows batch launcher
+├── start.ps1                # 1-Click PowerShell launcher
+├── PROJECT_AUDIT.md         # Detailed security, architecture & bug audit
+├── PROJECT_STATUS.md        # Real-time resolution report and runtime health
 └── README.md
 ```
 
 ---
 
-## 📋 Walkthrough & Usage Workflows
+## 📋 Features & Workflows
 
-### 1. Importing Contacts from CSV / Excel
-- Click **"Import Contacts"** in the top bar or sidebar.
-- Upload `sample_contacts.csv` (or your own `.xlsx` file).
-- The importer automatically detects columns (`name`, `phone`, `email`, `company`, `category`, `consent`).
-- Choose duplicate handling: **Skip** or **Update existing**.
-- Click **Execute Import** to review the import summary.
+### 1. Real-Time Overview Dashboard
+- Database-backed metrics: Total Contacts, Active Campaigns, Messages Sent, Inbound Replies, Open Inquiries, and Tasks Due Today.
+- Date range filtering (7, 30, 90, 365 days).
+- Live customer growth and category distribution charts.
 
-### 2. Creating Custom Categories
-- Navigate to **"Categories"**.
-- Create custom categories (e.g., "Wholesale Partners", "VIP Leads", "Follow-up Required") and assign colors.
-- Categories protect against accidental deletion if customers exist inside them.
+### 2. Contact Management & CSV/Excel Import
+- Create, edit, and bulk-tag contacts.
+- Assign lead stages (`lead`, `contacted`, `qualified`, `proposal`, `customer`, `churned`).
+- Safe CSV/Excel import with auto-detected column mappings and duplicate detection.
+- Formula injection protection (CWE-1236) sanitizing cells starting with `=`, `+`, `-`, or `@`.
+- Opt-out protection preventing CSV imports from accidentally clearing unsubscriptions.
 
-### 3. Creating Personalized Message Templates
-- Navigate to **"Message Templates"**.
-- Click **"New Template"**.
-- Click the `+{name}`, `+{company}`, or `+{category}` buttons to insert dynamic tags.
-- Watch the live preview update in the simulated WhatsApp chat bubble with instant character counts.
+### 3. Campaign Creation & Multi-Step Wizard
+- Step 1: Campaign details and internal notes.
+- Step 2: Recipient selection with real-time opt-out count and consent filters.
+- Step 3: Template selection with live variable substitution and missing variable warnings.
+- Step 4: Final verification and dispatch.
 
-### 4. Running a WhatsApp Campaign
-1. Click **"New Campaign"**.
-2. Give your campaign a name (e.g., *"VIP Autumn Update"*).
-3. Select recipient categories or choose individual contacts.
-4. Compose or select a saved template.
-5. Review the recipient roster and safety disclaimer.
-6. Click **"Initialize Sending Queue"**.
+### 4. Sending Modes: Manual vs. Gateway
+- **Manual Mode**: Opens personalized WhatsApp Web/Desktop chat via `wa.me` links. Each send is explicitly marked by the user.
+- **Gateway Mode**: Automated queue dispatch via linked Baileys session with rate pacing (configurable delay between messages) and state persistence to prevent duplicate sends on restart.
 
-### 5. Manual Sending Queue
-- The queue displays each recipient with their personalized message.
-- Click **"Open WhatsApp Chat"** to open `https://wa.me/<number>?text=<encoded_text>` in WhatsApp.
-- Send the message in WhatsApp.
-- Click **"Mark as Sent"** to record the confirmed send timestamp and advance to the next recipient.
-- Alternatively, click **"Skip Recipient"** or **"Cancel Campaign"**.
+### 5. Inbound Inbox & CRM Follow-Up
+- Full conversation history and inbound customer inquiries.
+- Categorization of inbound messages (`stop`, `pricing`, `help`, `general`).
+- Follow-up task creation with due dates, priorities, and status tracking.
 
-### 6. Backup & Migration
-- Go to **"Settings"**.
-- Click **"Download JSON Backup"** to save your entire database to a JSON file.
-- Use **"Restore from JSON File"** to restore snapshots across machines.
+### 6. Backup & Restore
+- Full JSON database export covering customers, categories, campaigns, recipients, conversations, messages, follow-up tasks, and consent audit logs.
+- Safe restore executed in topological foreign-key order inside an atomic SQLite transaction.
 
 ---
 
-## 🔒 Privacy & Security Architecture
+## 🔒 Security & Privacy Notice
 
-1. **Zero External Data Uploads**: Your customer contacts, notes, and messages are processed locally on `localhost`.
-2. **Formula Injection Sanitization**: All CSV exports sanitize cells starting with `=`, `+`, `-`, or `@` to neutralize CWE-1236 spreadsheet injection vulnerabilities.
-3. **Safe Storage**: SQLite database file is stored in the local application directory and is never served over static routes.
-4. **URL Encoding**: Click-to-chat links use strict RFC 3986 percent-encoding via `urllib.parse.quote(safe='')` to avoid link malformation.
+1. **Local-First Boundary**: Customer data, contact phone numbers, and messages are processed strictly on `127.0.0.1` and are never sent to external servers or cloud AI providers.
+2. **Safe Outreach Standards**: Respect recipient consent at all times. This software does not implement evasion techniques, CAPTCHA bypass, or account rotation workarounds.
+3. **Gateway Secret**: Always maintain a strong secret in `GATEWAY_WEBHOOK_SECRET` / `X-Gateway-Secret` to secure inbound webhook communication.
 
 ---
 
 ## 📄 License
 
-MIT License — Free and open-source for personal and commercial usage.
+MIT License — Free and open-source for personal and business use.

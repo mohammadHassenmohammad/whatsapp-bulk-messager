@@ -4,18 +4,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from backend.app.database import engine, Base, SessionLocal
+from backend.app.database import engine, Base, SessionLocal, run_migrations
 from backend.app.models.models import Category, MessageTemplate, AppSetting
 from backend.app.api import api_router
 
-# Initialize database tables
+# Initialize database tables and run schema migrations
 Base.metadata.create_all(bind=engine)
+run_migrations(engine)
 
 app = FastAPI(
     title="WhatsApp Campaign Manager API",
     description="Local-first backend for managing WhatsApp customer contacts, templates, and manual campaigns.",
     version="1.0.0"
 )
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "app": "WhatsApp Campaign Manager API", "version": "1.0.0"}
+
 
 # Static media uploads directory
 uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
