@@ -14,9 +14,14 @@ from backend.app.schemas.schemas import CampaignCreate
 
 def format_buttons_footer(body: str, buttons_json: Optional[str]) -> str:
     """
-    Appends URL action links to the message body if present.
-    Quick-reply buttons (e.g. ENQUIRE, STOP) are kept as interactive buttons
-    and are NOT injected as plain-text lines into the message body.
+    Formats buttons into clean numbered quick-reply triggers (Option B).
+    e.g.:
+    ──────────────────
+    Reply with a number:
+    1️⃣ *ENQUIRE*
+    2️⃣ *STOP*
+
+    🔗 *Shop now*: https://...
     """
     if not buttons_json:
         return body
@@ -24,16 +29,36 @@ def format_buttons_footer(body: str, buttons_json: Optional[str]) -> str:
         btns = json.loads(buttons_json) if isinstance(buttons_json, str) else buttons_json
         if not btns or not isinstance(btns, list):
             return body
-        lines = []
+
+        quick_replies = []
+        url_links = []
+        number_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+
         for b in btns:
             b_text = (b.get("text") or "").strip()
             b_type = b.get("type", "quick_reply")
             b_url = (b.get("url") or "").strip()
-            if b_type == "url" and b_url:
-                lines.append(f"🔗 *{b_text}*: {b_url}")
-        if lines:
-            if lines[0] not in body:
-                return f"{body.strip()}\n\n" + "\n".join(lines)
+
+            if (b_type == "url" or b.get("action") == "url") and b_url:
+                url_links.append(f"🔗 *{b_text}*: {b_url}")
+            elif b_text:
+                quick_replies.append(b_text)
+
+        blocks = []
+        if quick_replies:
+            reply_lines = [
+                f"{number_emojis[i] if i < len(number_emojis) else f'{i+1}.'} *{text}*"
+                for i, text in enumerate(quick_replies)
+            ]
+            blocks.append("Reply with a number:\n" + "\n".join(reply_lines))
+
+        if url_links:
+            blocks.append("\n".join(url_links))
+
+        if blocks:
+            full_footer = "\n\n──────────────────\n" + "\n\n".join(blocks)
+            if "──────────────────" not in body:
+                return f"{body.strip()}{full_footer}"
     except Exception:
         pass
     return body

@@ -258,25 +258,37 @@ app.post('/api/session/disconnect', async (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Helper: Dispatch message and native interactive quick reply buttons
+// Helper: Dispatch message with clean Option B numbered quick reply triggers
 async function sendInteractiveOrStandardMessage(sock, jid, { text, mediaUrl, buttons }) {
-  // Strip any legacy plain-text button footer so text remains clean
   let cleanBody = text || '';
-  const dividerIdx = cleanBody.indexOf('\n\n──────────────────\n');
-  if (dividerIdx !== -1) {
-    cleanBody = cleanBody.substring(0, dividerIdx).trim();
+
+  // If buttons are provided and not yet embedded as numbered triggers, format them cleanly
+  if (buttons && Array.isArray(buttons) && buttons.length > 0 && !cleanBody.includes('Reply with a number:')) {
+    const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
+    const quickReplies = buttons
+      .filter((b) => b.type === 'quick_reply' || b.action === 'quick_reply' || (!b.type && !b.url))
+      .map((b) => (b.text || '').trim())
+      .filter(Boolean);
+
+    const urlButtons = buttons.filter(
+      (b) => (b.type === 'url' || b.action === 'url') && b.url
+    );
+
+    const blocks = [];
+    if (quickReplies.length > 0) {
+      const lines = quickReplies.map((t, idx) => `${numberEmojis[idx] || `${idx + 1}.`} *${t}*`);
+      blocks.push(`Reply with a number:\n${lines.join('\n')}`);
+    }
+    if (urlButtons.length > 0) {
+      const urlLines = urlButtons.map((b) => `🔗 *${b.text}*: ${b.url}`);
+      blocks.push(urlLines.join('\n'));
+    }
+    if (blocks.length > 0) {
+      cleanBody = `${cleanBody.trim()}\n\n──────────────────\n${blocks.join('\n\n')}`;
+    }
   }
 
-  // Handle URL buttons as clickable preview links
-  const urlButtons = (buttons || []).filter(
-    (b) => (b.type === 'url' || b.action === 'url') && b.url
-  );
-  if (urlButtons.length > 0) {
-    const urlLines = urlButtons.map((b) => `🔗 *${b.text}*: ${b.url}`);
-    cleanBody = `${cleanBody}\n\n${urlLines.join('\n')}`;
-  }
-
-  // 1. Send main message (with media/image attachment if provided)
+  // Send main message (with media/image attachment if provided)
   let result;
   if (mediaUrl) {
     result = await sock.sendMessage(jid, {
@@ -285,26 +297,6 @@ async function sendInteractiveOrStandardMessage(sock, jid, { text, mediaUrl, but
     });
   } else {
     result = await sock.sendMessage(jid, { text: cleanBody });
-  }
-
-  // 2. Send native interactive Quick Reply buttons via WhatsApp Poll (100% supported across all WhatsApp clients)
-  const quickReplies = (buttons || [])
-    .filter((b) => b.type === 'quick_reply' || b.action === 'quick_reply' || (!b.type && !b.url))
-    .map((b) => (b.text || '').trim())
-    .filter(Boolean);
-
-  if (quickReplies.length > 0) {
-    try {
-      await sock.sendMessage(jid, {
-        poll: {
-          name: '👉 Quick Reply — Tap an option below:',
-          values: quickReplies,
-          selectableCount: 1,
-        },
-      });
-    } catch (pollErr) {
-      console.warn('[WhatsApp Gateway] Quick reply poll dispatch error:', pollErr.message);
-    }
   }
 
   return result;

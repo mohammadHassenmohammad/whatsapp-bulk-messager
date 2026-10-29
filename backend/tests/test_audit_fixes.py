@@ -279,3 +279,80 @@ def test_campaign_recipient_unique_constraint(test_db):
     with pytest.raises(Exception):
         test_db.commit()
     test_db.rollback()
+
+def test_option_b_numbered_quick_reply_triggers(test_db, test_client):
+    """Verify Option B: Clean numbered quick-reply triggers and automated inbound routing."""
+    import json
+    from backend.app.services.campaign_service import format_buttons_footer
+
+    # 1. Verify clean Option B message formatting
+    buttons = [
+        {"type": "quick_reply", "text": "ENQUIRE"},
+        {"type": "quick_reply", "text": "STOP"},
+        {"type": "url", "text": "Visit Store", "url": "https://example.com"}
+    ]
+    raw_body = "Hello! Check out our new update."
+    formatted = format_buttons_footer(raw_body, json.dumps(buttons))
+    assert "Reply with a number:" in formatted
+    assert "1️⃣ *ENQUIRE*" in formatted
+    assert "2️⃣ *STOP*" in formatted
+    assert "🔗 *Visit Store*: https://example.com" in formatted
+
+    # 2. Setup customer and recipient
+    cust = Customer(
+        full_name="Trigger User",
+        phone="15559871111",
+        formatted_phone="+15559871111",
+        lead_stage="New",
+        consent_status="unverified",
+        is_suppressed=False
+    )
+    test_db.add(cust)
+    test_db.commit()
+
+    cmp = Campaign(
+        name="Option B Campaign",
+        message_body_snapshot=formatted,
+        buttons_json=json.dumps(buttons),
+        status="in_progress"
+    )
+    test_db.add(cmp)
+    test_db.commit()
+
+    rec = CampaignRecipient(
+        campaign_id=cmp.id,
+        customer_id=cust.id,
+        recipient_name=cust.full_name,
+        recipient_phone=cust.phone,
+        personalized_message=formatted,
+        click_to_chat_url=f"https://wa.me/{cust.phone}",
+        status="sent"
+    )
+    test_db.add(rec)
+    test_db.commit()
+
+    # 3. Test Inbound reply '1' -> maps to ENQUIRE
+    headers = {"X-Gateway-Secret": "local_gateway_secure_token_123"}
+    resp1 = test_client.post(
+        "/api/webhooks/incoming",
+        headers=headers,
+        json={"phone": "15559871111", "text": "1", "message_id": "test_msg_1"}
+    )
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+    assert "received your enquiry" in data1.get("auto_reply", "").lower()
+
+    # 4. Test Inbound reply '2' -> maps to STOP and suppresses customer
+    resp2 = test_client.post(
+        "/api/webhooks/incoming",
+        headers=headers,
+        json={"phone": "15559871111", "text": "2", "message_id": "test_msg_2"}
+    )
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert "unsubscribed" in data2.get("auto_reply", "").lower()
+
+    test_db.refresh(cust)
+    assert cust.is_suppressed is True
+    assert cust.consent_status == "opted_out"
+

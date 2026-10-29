@@ -64,7 +64,30 @@ def handle_incoming_message(
 
     campaign_id = recent_recipient.campaign_id if recent_recipient else None
 
-    upper_text = text.upper()
+    # Handle numbered quick-reply triggers (Option B: e.g. "1", "2", "1️⃣", "2️⃣")
+    import json
+    clean_input = text.replace("1️⃣", "1").replace("2️⃣", "2").replace("3️⃣", "3").replace("4️⃣", "4").replace("5️⃣", "5").strip()
+    upper_text = clean_input.upper()
+
+    if clean_input.isdigit():
+        digit = int(clean_input)
+        mapped = False
+        if recent_recipient and recent_recipient.campaign and recent_recipient.campaign.buttons_json:
+            try:
+                camp_btns = json.loads(recent_recipient.campaign.buttons_json)
+                quick_btns = [b for b in camp_btns if b.get("type") != "url" and not b.get("url")]
+                if 1 <= digit <= len(quick_btns):
+                    target_btn = quick_btns[digit - 1]
+                    upper_text = (target_btn.get("text") or "").upper()
+                    mapped = True
+            except Exception:
+                pass
+        if not mapped:
+            if clean_input == "1":
+                upper_text = "ENQUIRE"
+            elif clean_input == "2":
+                upper_text = "STOP"
+
     auto_reply = None
     action_type = "general_reply"
     now = datetime.utcnow()
