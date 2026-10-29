@@ -126,11 +126,11 @@ export const api = {
     const res = await fetch('/gateway/api/session/disconnect', { method: 'POST' });
     return await res.json();
   },
-  sendDirectSingle: async (phone, message, mediaUrl = null) => {
+  sendDirectSingle: async (phone, message, mediaUrl = null, buttons = null) => {
     const res = await fetch('/gateway/api/messages/send-single', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, message, mediaUrl }),
+      body: JSON.stringify({ phone, message, mediaUrl, buttons }),
     });
     if (!res.ok) {
       const err = await res.json();

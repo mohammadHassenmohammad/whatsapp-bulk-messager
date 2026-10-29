@@ -6,6 +6,9 @@ const {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
+  proto,
+  generateWAMessageFromContent,
+  prepareWAMessageMedia,
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const path = require('path');
@@ -86,6 +89,18 @@ async function initWhatsApp(forceNew = false) {
           text = msg.message.templateButtonReplyMessage.selectedId;
         } else if (msg.message.listResponseMessage?.singleSelectReply?.selectedRowId) {
           text = msg.message.listResponseMessage.singleSelectReply.selectedRowId;
+        } else if (msg.message.interactiveResponseMessage) {
+          const resp = msg.message.interactiveResponseMessage;
+          try {
+            if (resp.nativeFlowResponseMessage?.paramsJson) {
+              const parsed = JSON.parse(resp.nativeFlowResponseMessage.paramsJson);
+              text = parsed.id || parsed.display_text || resp.body?.text;
+            } else {
+              text = resp.body?.text;
+            }
+          } catch (e) {
+            text = resp.body?.text;
+          }
         }
 
         if (!text) continue;
@@ -243,7 +258,116 @@ app.post('/api/session/disconnect', async (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Send single message (text or image with caption)
+// Helper: Dispatch native interactive buttons or standard message fallback
+async function sendInteractiveOrStandardMessage(sock, jid, { text, mediaUrl, buttons }) {
+  if (buttons && Array.isArray(buttons) && buttons.length > 0) {
+    try {
+      const nativeButtons = buttons.map((b, idx) => {
+        const bText = (b.text || '').trim();
+        const bType = b.type || (b.action === 'url' ? 'url' : 'quick_reply');
+        const bUrl = b.url || '';
+
+        if ((bType === 'url' || b.action === 'url') && bUrl) {
+          return {
+            name: 'cta_url',
+            buttonParamsJson: JSON.stringify({
+              display_text: bText,
+              url: bUrl,
+              merchant_url: bUrl,
+            }),
+          };
+        } else {
+          return {
+            name: 'quick_reply',
+            buttonParamsJson: JSON.stringify({
+              display_text: bText,
+              id: (b.id || b.action || `btn_${idx}_${bText}`).toString(),
+            }),
+          };
+        }
+      });
+
+      // Strip previously appended text button footer if present so it doesn't duplicate
+      let cleanBody = text || '';
+      const dividerIdx = cleanBody.indexOf('\n\n──────────────────\n');
+      if (dividerIdx !== -1) {
+        cleanBody = cleanBody.substring(0, dividerIdx).trim();
+      }
+
+      let header = { hasMediaAttachment: false };
+      if (mediaUrl) {
+        try {
+          const mediaMsg = await prepareWAMessageMedia(
+            { image: { url: mediaUrl } },
+            { upload: sock.waUploadToServer }
+          );
+          header = {
+            hasMediaAttachment: true,
+            imageMessage: mediaMsg.imageMessage,
+          };
+        } catch (mediaErr) {
+          console.warn('[WhatsApp Gateway] Media preparation error for interactive header:', mediaErr.message);
+        }
+      }
+
+      const interactiveMessage = proto.Message.InteractiveMessage.create({
+        body: proto.Message.InteractiveMessage.Body.create({
+          text: cleanBody,
+        }),
+        header: proto.Message.InteractiveMessage.Header.create(header),
+        nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+          buttons: nativeButtons,
+        }),
+      });
+
+      const messageContent = generateWAMessageFromContent(
+        jid,
+        {
+          viewOnceMessage: {
+            message: {
+              messageContextInfo: {
+                deviceListMetadata: {},
+                deviceListMetadataVersion: 2,
+              },
+              interactiveMessage: interactiveMessage,
+            },
+          },
+        },
+        {}
+      );
+
+      await sock.relayMessage(jid, messageContent.message, {
+        messageId: messageContent.key.id,
+      });
+
+      return { key: messageContent.key };
+    } catch (err) {
+      console.warn('[WhatsApp Gateway] Native button dispatch error, falling back to text format:', err.message);
+    }
+  }
+
+  // Fallback or standard send without interactive buttons
+  let finalMsg = text;
+  if (buttons && Array.isArray(buttons) && buttons.length > 0) {
+    const btnLines = buttons.map((b) =>
+      b.type === 'url' && b.url ? `🔗 *${b.text}*: ${b.url}` : `👉 Reply *${b.text}*`
+    );
+    if (!finalMsg.includes(btnLines[0])) {
+      finalMsg = `${finalMsg.trim()}\n\n──────────────────\n${btnLines.join('\n')}`;
+    }
+  }
+
+  if (mediaUrl) {
+    return await sock.sendMessage(jid, {
+      image: { url: mediaUrl },
+      caption: finalMsg,
+    });
+  } else {
+    return await sock.sendMessage(jid, { text: finalMsg });
+  }
+}
+
+// Send single message (text, native buttons, or image with caption)
 app.post('/api/messages/send-single', async (req, res) => {
   if (connectionStatus !== 'connected' || !sock) {
     return res.status(400).json({ error: 'WhatsApp Web is not connected. Please scan QR code first.' });
@@ -254,30 +378,16 @@ app.post('/api/messages/send-single', async (req, res) => {
     return res.status(400).json({ error: 'Phone and message are required' });
   }
 
-  let finalMessage = message;
-  if (buttons && Array.isArray(buttons) && buttons.length > 0) {
-    const btnLines = buttons.map((b) =>
-      b.type === 'url' && b.url ? `🔗 *${b.text}*: ${b.url}` : `👉 Reply *${b.text}*`
-    );
-    if (!finalMessage.includes(btnLines[0])) {
-      finalMessage = `${finalMessage.trim()}\n\n──────────────────\n${btnLines.join('\n')}`;
-    }
-  }
-
   const cleanPhone = phone.replace(/\D/g, '');
   const jid = `${cleanPhone}@s.whatsapp.net`;
 
   try {
-    let result;
-    if (mediaUrl) {
-      result = await sock.sendMessage(jid, {
-        image: { url: mediaUrl },
-        caption: finalMessage,
-      });
-    } else {
-      result = await sock.sendMessage(jid, { text: finalMessage });
-    }
-    res.json({ success: true, messageId: result.key.id });
+    const result = await sendInteractiveOrStandardMessage(sock, jid, {
+      text: message,
+      mediaUrl,
+      buttons,
+    });
+    res.json({ success: true, messageId: result?.key?.id });
   } catch (error) {
     console.error('Send error:', error);
     res.status(500).json({ error: error.message || 'Failed to send WhatsApp message' });
@@ -325,26 +435,15 @@ app.post('/api/messages/send-bulk', async (req, res) => {
       const cleanPhone = (rec.phone || '').replace(/\D/g, '');
       const jid = `${cleanPhone}@s.whatsapp.net`;
       const media = rec.media_url || rec.mediaUrl;
-      let finalMsg = rec.message;
-      if (rec.buttons && Array.isArray(rec.buttons) && rec.buttons.length > 0) {
-        const btnLines = rec.buttons.map((b) =>
-          b.type === 'url' && b.url ? `🔗 *${b.text}*: ${b.url}` : `👉 Reply *${b.text}*`
-        );
-        if (!finalMsg.includes(btnLines[0])) {
-          finalMsg = `${finalMsg.trim()}\n\n──────────────────\n${btnLines.join('\n')}`;
-        }
-      }
+      const recButtons = rec.buttons;
 
       try {
-        let result;
-        if (media) {
-          result = await sock.sendMessage(jid, {
-            image: { url: media },
-            caption: finalMsg,
-          });
-        } else {
-          result = await sock.sendMessage(jid, { text: finalMsg });
-        }
+        const result = await sendInteractiveOrStandardMessage(sock, jid, {
+          text: rec.message,
+          mediaUrl: media,
+          buttons: recButtons,
+        });
+
         activeBulkJob.sent += 1;
         saveBulkJobState();
         const messageKeyId = result?.key?.id;

@@ -180,10 +180,20 @@ export const CampaignQueue = () => {
 
     setIsUpdating(true);
     try {
+      let parsedButtons = [];
+      try {
+        if (campaign?.buttons_json) {
+          parsedButtons = typeof campaign.buttons_json === 'string'
+            ? JSON.parse(campaign.buttons_json)
+            : campaign.buttons_json;
+        }
+      } catch (e) {}
+
       await api.sendDirectSingle(
         currentRecipient.recipient_phone,
         currentRecipient.personalized_message,
-        currentRecipient.media_url || campaign?.header_media_url || null
+        currentRecipient.media_url || campaign?.header_media_url || null,
+        parsedButtons
       );
       await api.updateRecipientStatus(campaign.id, currentRecipient.id, {
         status: 'sent',
@@ -219,6 +229,15 @@ export const CampaignQueue = () => {
       return;
     }
 
+    let parsedButtons = [];
+    try {
+      if (campaign?.buttons_json) {
+        parsedButtons = typeof campaign.buttons_json === 'string'
+          ? JSON.parse(campaign.buttons_json)
+          : campaign.buttons_json;
+      }
+    } catch (e) {}
+
     const remaining = (campaign?.recipients || [])
       .filter((r) => r.status === 'prepared' || r.status === 'opened')
       .map((r) => ({
@@ -226,6 +245,7 @@ export const CampaignQueue = () => {
         phone: r.recipient_phone,
         message: r.personalized_message,
         mediaUrl: r.media_url || campaign?.header_media_url || null,
+        buttons: parsedButtons,
       }));
 
     if (remaining.length === 0) {
