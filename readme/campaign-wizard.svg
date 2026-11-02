@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <filter id="shadow2" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="680" rx="16" fill="url(#bgGrad2)" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- Top App Window Bar -->
+  <rect x="0" y="0" width="1200" height="44" rx="16" fill="#090d16"/>
+  <rect x="0" y="30" width="1200" height="14" fill="#090d16"/>
+  <circle cx="24" cy="22" r="6" fill="#ef4444"/>
+  <circle cx="44" cy="22" r="6" fill="#f59e0b"/>
+  <circle cx="64" cy="22" r="6" fill="#10b981"/>
+  <text x="600" y="27" font-family="sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle" font-weight="500">WhatsApp Campaign Manager • Campaign Creation &amp; Dynamic Personalization Wizard</text>
+
+  <!-- Step Bar -->
+  <rect x="180" y="65" width="840" height="50" rx="10" fill="#111827" stroke="#1f2937"/>
+  <!-- Step 1 -->
+  <circle cx="230" cy="90" r="14" fill="#10b981"/>
+  <text x="230" y="94" font-family="sans-serif" font-size="12" fill="#fff" font-weight="bold" text-anchor="middle">✓</text>
+  <text x="255" y="94" font-family="sans-serif" font-size="13" fill="#f8fafc" font-weight="600">1. Details</text>
+  <line x1="330" y1="90" x2="420" y2="90" stroke="#10b981" stroke-width="2"/>
+
+  <!-- Step 2 -->
+  <circle cx="450" cy="90" r="14" fill="#10b981"/>
+  <text x="450" y="94" font-family="sans-serif" font-size="12" fill="#fff" font-weight="bold" text-anchor="middle">✓</text>
+  <text x="475" y="94" font-family="sans-serif" font-size="13" fill="#f8fafc" font-weight="600">2. Audience</text>
+  <line x1="560" y1="90" x2="650" y2="90" stroke="#10b981" stroke-width="2"/>
+
+  <!-- Step 3 (Active) -->
+  <circle cx="680" cy="90" r="14" fill="#3b82f6"/>
+  <text x="680" y="95" font-family="sans-serif" font-size="12" fill="#fff" font-weight="bold" text-anchor="middle">3</text>
+  <text x="705" y="94" font-family="sans-serif" font-size="13" fill="#60a5fa" font-weight="bold">3. Template &amp; Tags</text>
+  <line x1="835" y1="90" x2="925" y2="90" stroke="#334155" stroke-width="2"/>
+
+  <!-- Step 4 -->
+  <circle cx="950" cy="90" r="14" fill="#334155"/>
+  <text x="950" y="95" font-family="sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">4</text>
+  <text x="975" y="94" font-family="sans-serif" font-size="13" fill="#94a3b8">4. Review</text>
+
+  <!-- Left Column: Template Editor & Variables -->
+  <g filter="url(#shadow2)">
+    <rect x="50" y="135" width="560" height="515" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="75" y="170" font-family="sans-serif" font-size="16" fill="#f8fafc" font-weight="bold">Message Template &amp; Copywriting</text>
+    <text x="75" y="190" font-family="sans-serif" font-size="12" fill="#94a3b8">Insert personalized placeholders that auto-populate per recipient.</text>
+
+    <!-- Quick Variable Chips -->
+    <text x="75" y="222" font-family="sans-serif" font-size="11" fill="#cbd5e1" font-weight="600">AVAILABLE VARIABLES:</text>
+    <rect x="75" y="232" width="75" height="24" rx="12" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6"/>
+    <text x="87" y="248" font-family="monospace" font-size="11" fill="#60a5fa">{first_name}</text>
+    <rect x="160" y="232" width="70" height="24" rx="12" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6"/>
+    <text x="172" y="248" font-family="monospace" font-size="11" fill="#60a5fa">{company}</text>
+    <rect x="240" y="232" width="65" height="24" rx="12" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6"/>
+    <text x="252" y="248" font-family="monospace" font-size="11" fill="#60a5fa">{stage}</text>
+    <rect x="315" y="232" width="65" height="24" rx="12" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6"/>
+    <text x="327" y="248" font-family="monospace" font-size="11" fill="#60a5fa">{discount}</text>
+
+    <!-- Template Textarea -->
+    <rect x="75" y="270" width="510" height="180" rx="8" fill="#0f172a" stroke="#334155"/>
+    <text x="90" y="300" font-family="sans-serif" font-size="13" fill="#e2e8f0">Hi <tspan fill="#38bdf8" font-weight="bold">{first_name}</tspan>! 👋</text>
+    <text x="90" y="325" font-family="sans-serif" font-size="13" fill="#e2e8f0">We loved working with <tspan fill="#38bdf8" font-weight="bold">{company}</tspan> this quarter.</text>
+    <text x="90" y="350" font-family="sans-serif" font-size="13" fill="#e2e8f0">We’ve activated an exclusive <tspan fill="#38bdf8" font-weight="bold">{discount}</tspan> voucher for your next</text>
+    <text x="90" y="375" font-family="sans-serif" font-size="13" fill="#e2e8f0">order. Click here to claim your credit: https://acme.inc/vip</text>
+    <text x="90" y="415" font-family="sans-serif" font-size="12" fill="#64748b">Reply STOP anytime to unsubscribe.</text>
+
+    <!-- Safety / Anti-Ban Rate Limiter -->
+    <text x="75" y="480" font-family="sans-serif" font-size="13" fill="#f8fafc" font-weight="bold">🛡️ Anti-Ban Humanized Rate Pacing</text>
+    <text x="75" y="500" font-family="sans-serif" font-size="11" fill="#94a3b8">Simulates realistic typing delay to protect your phone number.</text>
+    
+    <rect x="75" y="515" width="510" height="42" rx="8" fill="#111827" stroke="#334155"/>
+    <text x="95" y="541" font-family="sans-serif" font-size="12" fill="#cbd5e1">Delay Between Sends: <tspan fill="#10b981" font-weight="bold">8 to 15 seconds (Jittered)</tspan></text>
+    <circle cx="540" cy="536" r="6" fill="#10b981"/>
+
+    <!-- Compliance Opt-Out Safeguard Alert -->
+    <rect x="75" y="575" width="510" height="55" rx="8" fill="#064e3b" stroke="#059669"/>
+    <text x="90" y="598" font-family="sans-serif" font-size="12" fill="#a7f3d0" font-weight="bold">🔒 Opt-Out Protection Engine Active</text>
+    <text x="90" y="618" font-family="sans-serif" font-size="11" fill="#6ee7b7">4 contacts previously responded "STOP" or opted out. They are excluded automatically.</text>
+  </g>
+
+  <!-- Right Column: Live WhatsApp Mobile Simulator Preview -->
+  <g filter="url(#shadow2)">
+    <rect x="640" y="135" width="510" height="515" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="665" y="170" font-family="sans-serif" font-size="16" fill="#f8fafc" font-weight="bold">Live Recipient Preview (WhatsApp)</text>
+    <text x="665" y="190" font-family="sans-serif" font-size="12" fill="#94a3b8">Simulated view for contact: Sarah Jenkins (Acme Corp)</text>
+
+    <!-- Phone Shell -->
+    <rect x="715" y="210" width="360" height="415" rx="28" fill="#0b141a" stroke="#222d34" stroke-width="3"/>
+    
+    <!-- Phone Top Notch & WhatsApp Header -->
+    <rect x="717" y="212" width="356" height="55" rx="26" fill="#202c33"/>
+    <circle cx="750" cy="242" r="16" fill="#00a884"/>
+    <text x="750" y="247" font-family="sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">S</text>
+    <text x="775" y="238" font-family="sans-serif" font-size="13" fill="#e9edef" font-weight="bold">Sarah Jenkins</text>
+    <text x="775" y="253" font-family="sans-serif" font-size="10" fill="#8696a0">+1 (415) 555-0198 • online</text>
+    <text x="1035" y="246" font-family="sans-serif" font-size="16" fill="#aebac1">⋮</text>
+
+    <!-- WhatsApp Chat Area Background -->
+    <rect x="717" y="267" width="356" height="300" fill="#0b141a"/>
+    <circle cx="790" cy="300" r="1" fill="#182229"/>
+    
+    <!-- Date Chip -->
+    <rect x="850" y="280" width="90" height="20" rx="6" fill="#182229"/>
+    <text x="895" y="294" font-family="sans-serif" font-size="10" fill="#8696a0" text-anchor="middle">TODAY</text>
+
+    <!-- Outgoing Bubble -->
+    <rect x="770" y="315" width="285" height="135" rx="12" fill="#005c4b"/>
+    <text x="785" y="340" font-family="sans-serif" font-size="12" fill="#e9edef">Hi Sarah! 👋</text>
+    <text x="785" y="360" font-family="sans-serif" font-size="12" fill="#e9edef">We loved working with Acme Corp this</text>
+    <text x="785" y="380" font-family="sans-serif" font-size="12" fill="#e9edef">quarter. We've activated an exclusive</text>
+    <text x="785" y="400" font-family="sans-serif" font-size="12" fill="#53bdeb">25% OFF voucher for your next order.</text>
+    <text x="785" y="420" font-family="sans-serif" font-size="10" fill="#8696a0">Reply STOP anytime to unsubscribe.</text>
+    <text x="1010" y="440" font-family="sans-serif" font-size="9" fill="#8696a0">10:42 AM  ✓✓</text>
+
+    <!-- Incoming Reply Simulation Bubble -->
+    <rect x="735" y="465" width="220" height="50" rx="12" fill="#202c33"/>
+    <text x="750" y="488" font-family="sans-serif" font-size="12" fill="#e9edef">Thanks! Can I apply this to our</text>
+    <text x="750" y="504" font-family="sans-serif" font-size="12" fill="#e9edef">annual team subscription?</text>
+    <text x="915" y="508" font-family="sans-serif" font-size="9" fill="#8696a0">10:45 AM</text>
+  </g>
+</svg>
